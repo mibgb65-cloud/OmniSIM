@@ -130,13 +130,21 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
+
+          notes_file=".github/release-notes/${GITHUB_REF_NAME}.md"
+          if [[ -f "${notes_file}" ]]; then
+            notes_options=(--notes-file "${notes_file}")
+          else
+            notes_options=(--generate-notes)
+          fi
+
           gh release create "${GITHUB_REF_NAME}" \
             "${{ steps.asset.outputs.path }}" \
             "${{ steps.asset.outputs.checksum }}" \
             --verify-tag \
             --title "OmniSIM ${{ steps.version.outputs.version }}" \
-            --notes "This release contains an APK signed with the OmniSIM release certificate." \
-            --generate-notes
+            "${notes_options[@]}"
 
       - name: Remove restored signing key
         if: always()
