@@ -1,0 +1,101 @@
+name: Release unsigned APK
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish unsigned APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Validate release tag
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag="${GITHUB_REF_NAME}"
+          if [[ ! "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Release tags must use a version such as v1.0.0."
+            exit 1
+          fi
+
+          version="${tag#v}"
+          project_version="$(sed -n 's/^[[:space:]]*versionName = "\([^"]*\)"/\1/p' app/build.gradle.kts)"
+          if [[ -z "${project_version}" || "${version}" != "${project_version}" ]]; then
+            echo "::error::Tag ${tag} does not match app versionName ${project_version:-<missing>}."
+            exit 1
+          fi
+
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Test, lint, and build release APK
+        run: ./gradlew --no-daemon test lint assembleRelease
+
+      - name: Prepare unsigned release asset
+        id: asset
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          source_apk="app/build/outputs/apk/release/app-release-unsigned.apk"
+          if [[ ! -f "${source_apk}" ]]; then
+            echo "::error::Expected unsigned release APK was not produced."
+            exit 1
+          fi
+
+          apksigner="$(find "${ANDROID_HOME}/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          if [[ -z "${apksigner}" ]]; then
+            echo "::error::apksigner was not found in the Android SDK."
+            exit 1
+          fi
+          if "${apksigner}" verify "${source_apk}" >/dev/null 2>&1; then
+            echo "::error::The release APK is unexpectedly signed."
+            exit 1
+          fi
+
+          mkdir -p release
+          asset_name="OmniSIM-${{ steps.version.outputs.version }}-release-unsigned.apk"
+          cp "${source_apk}" "release/${asset_name}"
+          (
+            cd release
+            sha256sum "${asset_name}" > "${asset_name}.sha256"
+          )
+
+          echo "path=release/${asset_name}" >> "${GITHUB_OUTPUT}"
+          echo "checksum=release/${asset_name}.sha256" >> "${GITHUB_OUTPUT}"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            "${{ steps.asset.outputs.path }}" \
+            "${{ steps.asset.outputs.checksum }}" \
+            --verify-tag \
+            --title "OmniSIM ${{ steps.version.outputs.version }}" \
+            --notes "This release contains an unsigned APK. Sign it before installation or redistribution." \
+            --generate-notes

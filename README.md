@@ -80,6 +80,25 @@ On macOS or Linux:
 
 The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 
+## GitHub releases
+
+Pushing a semantic version tag runs `.github/workflows/release.yml`. The workflow
+tests and lints the project, builds the minified release variant, verifies that the
+APK is unsigned, and creates a GitHub Release containing the APK and its SHA-256
+checksum. It does not use signing secrets.
+
+Before releasing, update `versionCode` and `versionName` in
+`app/build.gradle.kts`, commit the change, and push a tag matching `versionName`:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The release asset is named `OmniSIM-<version>-release-unsigned.apk`. An unsigned
+APK cannot be installed as a normal production package; sign it with your release
+key before installation or redistribution.
+
 ## Tests and lint
 
 ```powershell
