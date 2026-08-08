@@ -53,7 +53,9 @@ jobs:
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
 
       - name: Test, lint, and build release APK
-        run: ./gradlew --no-daemon test lint assembleRelease
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --no-daemon test lint assembleRelease
 
       - name: Prepare unsigned release asset
         id: asset
