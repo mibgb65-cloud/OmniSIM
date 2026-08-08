@@ -1,0 +1,14 @@
+<resources>
+    <style name="Theme.OmniSIM" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowBackground">@color/omni_app_window_background</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+
+    <style name="Theme.OmniSIM.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/omni_splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_screen_empty</item>
+        <item name="postSplashScreenTheme">@style/Theme.OmniSIM</item>
+    </style>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="omni_app_window_background">#101412</color>
+    <color name="omni_splash_background">#101A1F</color>
+    <color name="omni_icon_background">#FFE24A</color>
+</resources>
