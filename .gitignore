@@ -9,3 +9,9 @@ captures/
 app/build/
 dist/
 .tmp-emulator/
+
+# Local Android release signing material
+local-signing/
+*.jks
+*.keystore
+keystore.properties

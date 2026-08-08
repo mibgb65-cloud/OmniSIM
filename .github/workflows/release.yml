@@ -1,4 +1,4 @@
-name: Release unsigned APK
+name: Release signed APK
 
 on:
   push:
@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   release:
-    name: Build and publish unsigned APK
+    name: Build and publish signed APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -52,20 +52,49 @@ jobs:
 
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
 
-      - name: Test, lint, and build release APK
+      - name: Restore release signing key
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.OMNISIM_KEYSTORE_BASE64 }}
         run: |
+          set -euo pipefail
+
+          if [[ -z "${KEYSTORE_BASE64}" ]]; then
+            echo "::error::OMNISIM_KEYSTORE_BASE64 is not configured."
+            exit 1
+          fi
+
+          printf '%s' "${KEYSTORE_BASE64}" | base64 --decode > "${RUNNER_TEMP}/omnisim-release.jks"
+          chmod 600 "${RUNNER_TEMP}/omnisim-release.jks"
+
+      - name: Test, lint, and build release APK
+        env:
+          OMNISIM_KEYSTORE_PATH: ${{ runner.temp }}/omnisim-release.jks
+          OMNISIM_KEYSTORE_PASSWORD: ${{ secrets.OMNISIM_KEYSTORE_PASSWORD }}
+          OMNISIM_KEY_ALIAS: ${{ secrets.OMNISIM_KEY_ALIAS }}
+          OMNISIM_KEY_PASSWORD: ${{ secrets.OMNISIM_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          for variable in OMNISIM_KEYSTORE_PASSWORD OMNISIM_KEY_ALIAS OMNISIM_KEY_PASSWORD; do
+            if [[ -z "${!variable:-}" ]]; then
+              echo "::error::${variable} is not configured."
+              exit 1
+            fi
+          done
+
           chmod +x ./gradlew
           ./gradlew --no-daemon test lint assembleRelease
 
-      - name: Prepare unsigned release asset
+      - name: Prepare signed release asset
         id: asset
         shell: bash
         run: |
           set -euo pipefail
 
-          source_apk="app/build/outputs/apk/release/app-release-unsigned.apk"
+          source_apk="app/build/outputs/apk/release/app-release.apk"
           if [[ ! -f "${source_apk}" ]]; then
-            echo "::error::Expected unsigned release APK was not produced."
+            echo "::error::Expected signed release APK was not produced."
             exit 1
           fi
 
@@ -74,13 +103,20 @@ jobs:
             echo "::error::apksigner was not found in the Android SDK."
             exit 1
           fi
-          if "${apksigner}" verify "${source_apk}" >/dev/null 2>&1; then
-            echo "::error::The release APK is unexpectedly signed."
+          if ! "${apksigner}" verify --verbose --print-certs "${source_apk}"; then
+            echo "::error::The release APK signature is invalid."
+            exit 1
+          fi
+
+          expected_signer_digest="58146fc8f47be9fc5729f9c149dc8f17877a646692bb23c4f8130a2232d441cb"
+          signer_digest="$("${apksigner}" verify --print-certs "${source_apk}" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')"
+          if [[ "${signer_digest}" != "${expected_signer_digest}" ]]; then
+            echo "::error::The release APK was signed with an unexpected certificate."
             exit 1
           fi
 
           mkdir -p release
-          asset_name="OmniSIM-${{ steps.version.outputs.version }}-release-unsigned.apk"
+          asset_name="OmniSIM-${{ steps.version.outputs.version }}-release.apk"
           cp "${source_apk}" "release/${asset_name}"
           (
             cd release
@@ -99,5 +135,9 @@ jobs:
             "${{ steps.asset.outputs.checksum }}" \
             --verify-tag \
             --title "OmniSIM ${{ steps.version.outputs.version }}" \
-            --notes "This release contains an unsigned APK. Sign it before installation or redistribution." \
+            --notes "This release contains an APK signed with the OmniSIM release certificate." \
             --generate-notes
+
+      - name: Remove restored signing key
+        if: always()
+        run: rm -f "${RUNNER_TEMP}/omnisim-release.jks"

@@ -23,9 +23,9 @@
 > to a remote server.
 
 > [!IMPORTANT]
-> GitHub Releases currently provide an **unsigned APK** for verification and
-> downstream signing. Sign it with your own release key before installation or
-> production distribution.
+> GitHub Releases provide an APK signed with OmniSIM's long-term release
+> certificate. It can be installed directly and used for in-place updates. Android
+> may still ask for permission to install unknown apps when sideloading from GitHub.
 
 ## Purpose
 
@@ -205,10 +205,18 @@ The workflow:
 1. Validates the tag against the app version.
 2. Runs tests and lint.
 3. Builds the R8 release APK.
-4. Verifies that the APK is unsigned and generates a SHA-256 checksum.
+4. Verifies the APK signing certificate and generates a SHA-256 checksum.
 5. Creates a GitHub Release and uploads both files.
 
-Assets are named `OmniSIM-<version>-release-unsigned.apk`.
+The release key is injected through encrypted GitHub Actions Secrets and never
+enters source control or build logs. Assets are named
+`OmniSIM-<version>-release.apk`.
+
+Release certificate SHA-256:
+
+```text
+58146fc8f47be9fc5729f9c149dc8f17877a646692bb23c4f8130a2232d441cb
+```
 
 ## Contributing
 

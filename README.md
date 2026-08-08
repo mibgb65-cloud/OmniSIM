@@ -22,8 +22,8 @@
 > Android 设备上，不需要账号，也不会上传到远程服务器。
 
 > [!IMPORTANT]
-> GitHub Release 当前提供的是**未签名 APK**，用于验证和后续签名流程。安装或正式
-> 分发前，必须使用你自己的发布密钥签名。
+> GitHub Release 提供使用 OmniSIM 长期发布证书签名的 APK，可用于直接安装和后续
+> 覆盖升级。首次从 GitHub 安装时，Android 仍可能要求允许浏览器或文件管理器安装未知应用。
 
 ## 项目定位
 
@@ -196,10 +196,17 @@ git push origin v1.0.1
 1. 校验标签与应用版本。
 2. 执行测试和 Lint。
 3. 通过 R8 构建 Release APK。
-4. 验证 APK 未签名并生成 SHA-256。
+4. 验证 APK 签名证书并生成 SHA-256。
 5. 创建 GitHub Release 并上传两个文件。
 
-发布产物命名为 `OmniSIM-<version>-release-unsigned.apk`。
+发布密钥通过加密的 GitHub Actions Secrets 注入，不会进入源码或构建日志。发布产物
+命名为 `OmniSIM-<version>-release.apk`。
+
+正式发布证书 SHA-256：
+
+```text
+58146fc8f47be9fc5729f9c149dc8f17877a646692bb23c4f8130a2232d441cb
+```
 
 ## 参与贡献
 
