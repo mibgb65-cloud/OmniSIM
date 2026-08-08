@@ -109,7 +109,16 @@ jobs:
           fi
 
           expected_signer_digest="58146fc8f47be9fc5729f9c149dc8f17877a646692bb23c4f8130a2232d441cb"
-          signer_digest="$("${apksigner}" verify --print-certs "${source_apk}" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')"
+          signer_digest="$(
+            "${apksigner}" verify --print-certs "${source_apk}" \
+              | awk '/Signer #1 certificate SHA-256 digest:/ { print $NF; exit }' \
+              | tr '[:upper:]' '[:lower:]' \
+              | tr -d '[:space:]'
+          )"
+          if [[ -z "${signer_digest}" ]]; then
+            echo "::error::The release certificate digest could not be read."
+            exit 1
+          fi
           if [[ "${signer_digest}" != "${expected_signer_digest}" ]]; then
             echo "::error::The release APK was signed with an unexpected certificate."
             exit 1
