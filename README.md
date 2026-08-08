@@ -1,164 +1,223 @@
-# OmniSIM
+<div align="center">
+  <h1>OmniSIM</h1>
+  <p><strong>SIM 与 eSIM 续费管理器</strong></p>
+  <p>为多张 SIM 统一管理续费、充值与保号日期。轻量、本地优先，无需账号。</p>
+  <p><strong>简体中文</strong> · <a href="README_EN.md">English</a></p>
+  <p>
+    <a href="https://github.com/mibgb65-cloud/OmniSIM/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/mibgb65-cloud/OmniSIM?style=flat-square&amp;label=release"></a>
+    <a href="https://github.com/mibgb65-cloud/OmniSIM/actions/workflows/release.yml"><img alt="Release workflow" src="https://img.shields.io/github/actions/workflow/status/mibgb65-cloud/OmniSIM/release.yml?style=flat-square&amp;label=release%20workflow"></a>
+    <img alt="Android 6.0+" src="https://img.shields.io/badge/Android-6.0%2B-3DDC84?style=flat-square&amp;logo=android&amp;logoColor=white">
+    <img alt="Kotlin 2.3.21" src="https://img.shields.io/badge/Kotlin-2.3.21-7F52FF?style=flat-square&amp;logo=kotlin&amp;logoColor=white">
+    <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/github/license/mibgb65-cloud/OmniSIM?style=flat-square"></a>
+  </p>
+  <p>
+    <a href="https://github.com/mibgb65-cloud/OmniSIM/releases/latest">下载最新版本</a> ·
+    <a href="https://github.com/mibgb65-cloud/OmniSIM/releases">查看发布记录</a> ·
+    <a href="https://github.com/mibgb65-cloud/OmniSIM/issues">提交问题</a>
+  </p>
+</div>
 
-**简体中文** | [English](README_EN.md)
+> [!NOTE]
+> OmniSIM 以本地存储为核心。手机号码、SIM 信息、续费日期和备注保存在你的
+> Android 设备上，不需要账号，也不会上传到远程服务器。
 
-**SIM 与 eSIM 续费管理器**
+> [!IMPORTANT]
+> GitHub Release 当前提供的是**未签名 APK**，用于验证和后续签名流程。安装或正式
+> 分发前，必须使用你自己的发布密钥签名。
 
-再也不错过 SIM 续费。
+## 项目定位
 
-OmniSIM 是一款轻量的 Android 原生工具，用于管理 SIM 和 eSIM 的续费、充值及
-保号日期。它面向需要管理少量号码的个人用户，无需账号，也不依赖后端服务。
+OmniSIM 面向需要管理少量 SIM/eSIM 的个人用户，专注回答三个问题：
 
-## 功能
+1. 我有哪些 SIM？
+2. 哪张 SIM 最快需要续费？
+3. 完成续费后，下一个续费日期是什么时候？
 
-- 首页优先显示下一张需要处理的 SIM
-- 根据日期自动计算已逾期、今日到期、即将到期、使用中和已归档状态
-- SIM/eSIM 信息本地持久化，支持搜索和实用筛选
-- 支持 30、60、90、120、180、365 天及自定义续费周期
-- 快速“标记为已续费”，并可修改自动计算的下次续费日期
-- 支持单卡续费历史和可筛选的全局续费历史，可记录金额与备注
-- 安全打开外部续费链接
-- 支持归档、恢复及带二次确认的删除操作
-- 通过可配置偏移量和去重机制提供近似每日本地提醒
-- 支持跟随系统、浅色、深色主题及可选的 Material You 动态配色
-- 默认隐藏手机号码的部分数字
-- 使用欧洲中央银行每日参考汇率估算不同货币的合计成本，并提供离线缓存回退
-- 设置中内置隐私与权限说明和简明使用指南
-- 通过 Android 存储访问框架导出版本化 JSON，并进行校验和事务性恢复
+核心流程保持简单：
 
-## 截图
+```text
+打开应用 → 查看最近续费 → 选择 SIM → 在运营商渠道完成续费
+        → 标记为已续费 → 确认实际日期 → 保存历史并重新安排提醒
+```
 
-截图将在首个正式版本后补充。
+## 功能概览
 
-| 首页 | SIM 详情 | 设置 |
-| --- | --- | --- |
-| _即将补充_ | _即将补充_ | _即将补充_ |
+| 范围 | 能力 |
+| --- | --- |
+| 续费管理 | 按日期排序、逾期/今日到期/即将到期状态、30–365 天预设及自定义周期 |
+| SIM 档案 | 名称、运营商、国家/地区、号码、类型、套餐、续费网址和备注 |
+| 续费操作 | 根据实际续费日期计算下次日期，允许修改后确认，事务性保存历史 |
+| 历史记录 | 单卡续费历史和可按 SIM、时间范围筛选的全局时间轴 |
+| 提醒 | WorkManager 近似每日检查、多个提醒偏移量、通知去重、续费后重新调度 |
+| 成本 | 记录金额与币种，使用欧洲中央银行参考汇率估算统一货币总成本 |
+| 数据 | Room 本地数据库、DataStore 设置、版本化 JSON 备份与事务性恢复 |
+| 外观 | 跟随系统/浅色/深色主题、可选 Material You、简体中文和英语 |
+| 隐私 | 默认隐藏部分号码，无分析、遥测、广告、账号或远程日志 |
 
-## 隐私
+## 界面预览
 
-OmniSIM 以本地存储为核心。
+正式截图将在准备好不包含测试号码、通知浮层和设备状态栏干扰的素材后加入。
 
-你的手机号码、SIM 信息、续费日期和备注均保存在 Android 设备本地。
+| 首页 | SIM 列表 | 设置 |
+| :---: | :---: | :---: |
+| 最近续费与时间轴 | 搜索、状态筛选与档案 | 外观、提醒、隐私与数据 |
 
-OmniSIM 不需要账号，也不会将你的 SIM 数据上传到远程服务器。
+## 隐私与权限
 
-应用不包含分析、遥测、广告、远程日志或云服务。SIM 管理和提醒等核心功能可完全
-离线使用。仅当“使用情况”页面需要进行货币换算时，OmniSIM 才会下载欧洲中央银行
-公开的每日参考汇率 XML 并缓存在本地；请求不会携带 SIM 数据、手机号码、价格或
-续费日期。只有用户主动点击续费网站时，应用才会使用用户选择的浏览器打开该链接。
+核心 SIM 管理、续费历史、提醒和备份功能均可离线工作。
 
-## Android 要求
+| 项目 | 行为 |
+| --- | --- |
+| 本地数据 | 手机号码、SIM 信息、日期、价格和备注仅保存在设备本地 |
+| 网络访问 | 仅获取欧洲中央银行公开的每日参考汇率，或由用户主动打开续费网站 |
+| 汇率请求 | 不携带 SIM 数据、手机号码、价格或续费日期，并使用本地缓存回退 |
+| 数据收集 | 不包含分析、遥测、广告、崩溃上报或远程日志 |
+| 账号与云端 | 不提供账号、登录、云同步或后端服务 |
 
-- Android 6.0（API 23）或更高版本
-- Android 13 及更高版本仅在用户主动启用提醒后请求通知权限
-- Android 12 及更高版本可使用基于壁纸的 Material You 动态配色
+应用仅声明必要权限：
 
-## 开发环境
+| 权限 | 用途 |
+| --- | --- |
+| `POST_NOTIFICATIONS` | Android 13+ 在用户主动启用提醒后请求续费通知权限 |
+| `INTERNET` | 下载欧洲中央银行公开的参考汇率数据 |
 
-1. 安装 Android Studio，或安装包含 API 36 和 Build Tools 35.0.0 及更高版本的
-   Android SDK。
-2. 安装 JDK 17 或更高版本；项目编译为 Java 17 字节码。
-3. 克隆仓库并在 Android Studio 中打开项目根目录。
-4. 等待 Gradle 同步完成，然后在模拟器或设备上运行 `app` 配置。
+续费网址通过外部浏览器打开，不需要应用直接访问网站内容。
 
-项目已提交 Gradle Wrapper。在 Windows PowerShell 中构建：
+OmniSIM 不请求联系人、短信、电话、通话记录、位置、相机、麦克风或广泛存储权限。
+
+## 技术栈
+
+- Kotlin 2.3.21、Jetpack Compose、Material 3
+- Navigation Compose、不可变 `StateFlow` UI 状态
+- Room/SQLite、DataStore Preferences
+- Coroutines、Flow、WorkManager、Android 通知 API
+- Kotlin Serialization、Android Storage Access Framework
+- 最低 Android 6.0（API 23），目标 Android API 36
+
+## 架构
+
+```mermaid
+flowchart TD
+    UI[Jetpack Compose UI] --> VM[AppViewModel / StateFlow]
+    VM --> SIM[SimRepository]
+    VM --> SETTINGS[SettingsRepository]
+    VM --> BACKUP[BackupManager]
+    VM --> REMINDER[ReminderScheduler]
+    SIM --> ROOM[(Room / SQLite)]
+    SETTINGS --> DATASTORE[(DataStore)]
+    REMINDER --> WORK[WorkManager]
+    VM --> RATE[ExchangeRateRepository]
+    RATE --> ECB[ECB 公开参考汇率]
+```
+
+项目使用轻量应用容器组织依赖，不引入额外的依赖注入框架。
+
+### 数据模型
+
+| 表 | 说明 |
+| --- | --- |
+| `sims` | SIM 身份信息、续费配置和归档状态 |
+| `renewal_history` | 实际续费日期、前后日期、金额、币种和备注；随 SIM 级联删除 |
+| `reminder_state` | `SIM + 续费日期 + 提醒偏移量` 唯一通知记录 |
+
+续费截止日期使用 `LocalDate`，创建和更新时间等元数据使用 `Instant`，避免时区变化
+导致日历日期偏移。
+
+## 快速开始
+
+### 环境要求
+
+- Android Studio，或 Android SDK API 36 与 Build Tools 35.0.0+
+- JDK 17+
+- Git
+
+### 获取源码
+
+```bash
+git clone https://github.com/mibgb65-cloud/OmniSIM.git
+cd OmniSIM
+```
+
+### 构建 Debug APK
+
+Windows PowerShell：
 
 ```powershell
 .\gradlew.bat assembleDebug
 ```
 
-在 macOS 或 Linux 中构建：
+macOS 或 Linux：
 
 ```bash
 ./gradlew assembleDebug
 ```
 
-Debug APK 位于 `app/build/outputs/apk/debug/app-debug.apk`。
+产物位于 `app/build/outputs/apk/debug/app-debug.apk`。
 
-## GitHub 发布
-
-推送语义化版本标签会运行 `.github/workflows/release.yml`。工作流会执行测试和
-Lint、构建经过压缩的 Release 版本、确认 APK 未签名，并创建包含 APK 与 SHA-256
-校验文件的 GitHub Release。整个流程不使用签名密钥或签名 Secrets。
-
-发布前需要修改 `app/build.gradle.kts` 中的 `versionCode` 和 `versionName`，提交
-修改后推送与 `versionName` 一致的标签：
-
-```bash
-git tag v1.0.1
-git push origin v1.0.1
-```
-
-发布文件命名为 `OmniSIM-<version>-release-unsigned.apk`。未签名 APK 不能作为
-普通正式安装包直接安装，安装或分发前必须使用正式发布密钥进行签名。
-
-## 测试与 Lint
-
-```powershell
-.\gradlew.bat test
-.\gradlew.bat lint
-```
-
-业务逻辑测试覆盖续费日期计算、状态优先级、提醒匹配与去重，以及备份数据校验。
-
-## 架构
-
-OmniSIM 有意保持简单的架构：
-
-```text
-Jetpack Compose UI
-        ↓
-AppViewModel + 不可变 StateFlow 状态
-        ↓
-SimRepository / SettingsRepository
-        ↓
-Room / DataStore Preferences
-```
-
-一个轻量的应用容器负责提供数据库、Repository、备份管理器和提醒调度器。项目不使用
-依赖注入框架或云服务。
-
-Room 保存三张数据表：
-
-- `sims`：SIM 身份信息和续费配置
-- `renewal_history`：SIM 对应的实际续费记录，随 SIM 级联删除
-- `reminder_state`：已经发送的唯一 SIM/日期/偏移量提醒状态
-
-续费截止日期以 ISO `LocalDate` 保存，只有创建和更新时间等元数据使用 `Instant`，
-避免时区变化导致日历日期偏移。
-
-## 备份与恢复
-
-通过“设置 → 数据”可以导出和导入 JSON。目标文件和来源文件由 Android 文档选择器
-确定，因此 OmniSIM 不需要广泛的存储权限。
-
-备份包含 `backupVersion`、SIM、续费历史和相关设置。显示恢复确认前，OmniSIM 会
-完整解析并校验 ID、引用关系、日期、必填值、价格和安全的 HTTP(S) 链接。数据库替换
-通过 Room 事务完成；无效输入不会修改现有数据。
-
-## 通知行为
-
-OmniSIM 会调度一个省电的周期性 WorkManager 任务。默认检查提前 30、14、7、3、1、
-0 天以及已逾期状态，并在通知后记录唯一的 `SIM ID + 续费日期 + 提醒偏移量` 标记。
-SIM 续费后会清除该 SIM 的旧提醒状态。
-
-WorkManager 的执行时间是近似的。Doze、省电模式、应用待机或厂商电池策略可能延迟
-后台任务，因此通知是日期提醒，不保证在某个精确时刻送达。OmniSIM 不请求精确闹钟
-权限，也不运行持续后台服务。
-
-## 参与贡献
-
-欢迎提交 Issue 和范围明确的 Pull Request。请保持 OmniSIM 的目标：为个人管理少量
-SIM 提供快速、私密、本地优先的续费提醒。
-
-提交修改前请运行：
+### 测试与静态检查
 
 ```powershell
 .\gradlew.bat assembleDebug test lint
 ```
 
-请勿加入分析、账号系统、云基础设施或不必要的权限和依赖。
+单元测试覆盖日期计算、状态优先级、提醒匹配与去重、汇率解析、成本换算、备份校验
+和续费历史筛选。
+
+## 备份与恢复
+
+“设置 → 数据”通过 Android 文档选择器导出或导入 JSON，无需广泛存储权限。备份包含
+`backupVersion`、SIM、续费历史和相关设置。
+
+恢复前会完整校验 ID、引用关系、日期、必填值、金额和安全的 HTTP(S) 链接；数据库
+替换在 Room 事务中完成，无效输入不会修改现有数据。
+
+## 通知行为
+
+OmniSIM 使用单个省电的周期性 WorkManager 任务，默认支持提前 30、14、7、3、1、
+0 天及已逾期提醒。通知使用 `SIM ID + 续费日期 + 偏移量` 去重，续费后会清理旧状态
+并重新调度。
+
+WorkManager 的执行时间是近似的。Doze、省电模式、应用待机和厂商电池策略可能延迟
+后台任务，因此提醒不保证在某个精确时刻送达。
+
+## 自动发布
+
+推送与 `versionName` 一致的语义化版本标签，会触发
+[Release workflow](.github/workflows/release.yml)：
+
+```bash
+# 先更新 app/build.gradle.kts 中的 versionCode 和 versionName
+git tag v1.0.1
+git push origin v1.0.1
+```
+
+工作流会：
+
+1. 校验标签与应用版本。
+2. 执行测试和 Lint。
+3. 通过 R8 构建 Release APK。
+4. 验证 APK 未签名并生成 SHA-256。
+5. 创建 GitHub Release 并上传两个文件。
+
+发布产物命名为 `OmniSIM-<version>-release-unsigned.apk`。
+
+## 参与贡献
+
+欢迎提交 [Issue](https://github.com/mibgb65-cloud/OmniSIM/issues) 和范围明确的 Pull
+Request。请保持修改聚焦于轻量、私密、本地优先的 SIM 续费管理体验。
+
+提交前请运行：
+
+```powershell
+.\gradlew.bat assembleDebug test lint
+```
+
+请勿引入分析、广告、账号系统、云同步或不必要的权限和依赖。
 
 ## 许可证
 
 OmniSIM 使用 [MIT License](LICENSE) 发布。
+
+<div align="center">
+  <strong>Never miss a SIM renewal again.</strong>
+</div>

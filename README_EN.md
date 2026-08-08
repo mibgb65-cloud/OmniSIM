@@ -1,169 +1,220 @@
-# OmniSIM
+<div align="center">
+  <h1>OmniSIM</h1>
+  <p><strong>SIM &amp; eSIM Renewal Manager</strong></p>
+  <p>Keep renewal, recharge, and keep-alive dates for multiple SIMs in one place.<br>Lightweight, local-first, and account-free.</p>
+  <p><a href="README.md">简体中文</a> · <strong>English</strong></p>
+  <p>
+    <a href="https://github.com/mibgb65-cloud/OmniSIM/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/mibgb65-cloud/OmniSIM?style=flat-square&amp;label=release"></a>
+    <a href="https://github.com/mibgb65-cloud/OmniSIM/actions/workflows/release.yml"><img alt="Release workflow" src="https://img.shields.io/github/actions/workflow/status/mibgb65-cloud/OmniSIM/release.yml?style=flat-square&amp;label=release%20workflow"></a>
+    <img alt="Android 6.0+" src="https://img.shields.io/badge/Android-6.0%2B-3DDC84?style=flat-square&amp;logo=android&amp;logoColor=white">
+    <img alt="Kotlin 2.3.21" src="https://img.shields.io/badge/Kotlin-2.3.21-7F52FF?style=flat-square&amp;logo=kotlin&amp;logoColor=white">
+    <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/github/license/mibgb65-cloud/OmniSIM?style=flat-square"></a>
+  </p>
+  <p>
+    <a href="https://github.com/mibgb65-cloud/OmniSIM/releases/latest">Download latest release</a> ·
+    <a href="https://github.com/mibgb65-cloud/OmniSIM/releases">Release history</a> ·
+    <a href="https://github.com/mibgb65-cloud/OmniSIM/issues">Report an issue</a>
+  </p>
+</div>
 
-[简体中文](README.md) | **English**
+> [!NOTE]
+> OmniSIM is local-first. Phone numbers, SIM information, renewal dates, and notes
+> stay on your Android device. No account is required, and SIM data is not uploaded
+> to a remote server.
 
-**SIM & eSIM Renewal Manager**
+> [!IMPORTANT]
+> GitHub Releases currently provide an **unsigned APK** for verification and
+> downstream signing. Sign it with your own release key before installation or
+> production distribution.
 
-Never miss a SIM renewal again.
+## Purpose
 
-OmniSIM is a small, native Android utility for keeping track of SIM and eSIM
-renewal, recharge, and keep-alive dates. It is designed for a single person with a
-handful of numbers and works without an account or backend.
+OmniSIM is designed for one person managing a small number of SIMs and eSIMs. It
+focuses on answering three questions:
+
+1. What SIMs do I have?
+2. Which SIM needs attention next?
+3. After renewal, when is the next renewal?
+
+The primary flow stays intentionally short:
+
+```text
+Open → See the nearest renewal → Select a SIM → Renew through the carrier
+     → Mark as renewed → Confirm the actual date → Save history and reschedule reminders
+```
 
 ## Features
 
-- Home screen focused on the SIM that needs attention next
-- Overdue, due-today, due-soon, active, and archived states derived from dates
-- Persistent SIM/eSIM records with search and practical filters
-- 30, 60, 90, 120, 180, 365-day and custom renewal cycles
-- Fast **Mark as Renewed** flow with an editable calculated next date
-- Per-SIM and filterable global renewal history, optional amount, notes, and safe external renewal links
-- Archive/restore and confirmation-protected deletion
-- Approximate daily local reminders with per-offset controls and deduplication
-- System, light, and dark themes with optional Material You dynamic color
-- Phone-number masking enabled by default
-- Automatic daily ECB reference-rate conversion for a combined cost estimate,
-  with an offline cached-rate fallback
-- Built-in privacy and permission details plus a concise usage guide in Settings
-- Versioned JSON export and validated, transactional database restore through the
-  Android Storage Access Framework
+| Area | Capabilities |
+| --- | --- |
+| Renewal tracking | Date-sorted records, overdue/due-today/due-soon states, 30–365 day presets, and custom cycles |
+| SIM profiles | Name, carrier, country/region, number, type, plan, renewal URL, and notes |
+| Renewal flow | Calculate from the actual renewal date, allow an override, and save history transactionally |
+| History | Per-SIM history plus a global timeline filterable by SIM and time range |
+| Reminders | Approximate daily WorkManager checks, multiple offsets, deduplication, and renewal rescheduling |
+| Cost | Store amount and currency; estimate a combined total using ECB reference rates |
+| Data | Local Room database, DataStore settings, versioned JSON backup, and transactional restore |
+| Appearance | System/light/dark themes, optional Material You, Simplified Chinese, and English |
+| Privacy | Phone masking by default; no analytics, telemetry, advertising, accounts, or remote logging |
 
-## Screenshots
+## Preview
 
-Screenshots will be added after the first tagged release.
+Product screenshots will be added after a clean, anonymized capture set is ready,
+without test phone numbers, notification overlays, or distracting system UI.
 
-| Home | SIM details | Settings |
-| --- | --- | --- |
-| _Coming soon_ | _Coming soon_ | _Coming soon_ |
+| Home | SIM list | Settings |
+| :---: | :---: | :---: |
+| Nearest renewal and timeline | Search, status filters, and profiles | Appearance, reminders, privacy, and data |
 
-## Privacy
+## Privacy and permissions
 
-OmniSIM is local-first.
+Core SIM management, renewal history, reminders, and backup work offline.
 
-Your phone numbers, SIM information, renewal dates and notes are stored locally on
-your Android device.
+| Topic | Behavior |
+| --- | --- |
+| Local data | Phone numbers, SIM details, dates, prices, and notes remain on the device |
+| Network access | Used only for public ECB reference rates or a renewal website opened by the user |
+| Rate requests | Never include SIM data, phone numbers, prices, or renewal dates; cached rates provide fallback |
+| Data collection | No analytics, telemetry, advertising, crash reporting, or remote logging |
+| Accounts and cloud | No accounts, login, cloud sync, or backend service |
 
-OmniSIM does not require an account and does not upload your SIM data to a remote
-server.
+The app declares only the permissions it needs:
 
-The app contains no analytics, telemetry, advertising, remote logging, or cloud
-service. Core SIM tracking and reminders work offline. When the Usage screen needs
-currency conversion, OmniSIM downloads the European Central Bank's public daily
-reference-rate XML and caches it locally; no SIM data, phone numbers, prices, or
-renewal dates are sent with that request. A renewal website is opened only after
-the user explicitly taps it, using the user's chosen browser.
+| Permission | Purpose |
+| --- | --- |
+| `POST_NOTIFICATIONS` | Renewal notifications on Android 13+, requested only after the user enables reminders |
+| `INTERNET` | Download public European Central Bank reference-rate data |
 
-## Android requirements
+Renewal URLs are handed to an external browser; the app does not fetch their content.
 
-- Android 6.0 (API 23) or newer
-- Android 13+ asks for notification permission only after the user chooses to
-  enable reminders in Settings
-- Android 12+ can use wallpaper-derived Material You colors
+OmniSIM does not request contacts, SMS, phone, call-log, location, camera,
+microphone, or broad storage access.
 
-## Development setup
+## Technology
 
-1. Install Android Studio or an Android SDK with API 36 and Build Tools 35.0.0 or
-   newer.
-2. Install JDK 17 or newer. The project is compiled to Java 17 bytecode.
-3. Clone the repository and open its root directory in Android Studio.
-4. Let Gradle sync, then run the `app` configuration on an emulator or device.
+- Kotlin 2.3.21, Jetpack Compose, and Material 3
+- Navigation Compose and immutable `StateFlow` UI state
+- Room/SQLite and DataStore Preferences
+- Coroutines, Flow, WorkManager, and Android notification APIs
+- Kotlin Serialization and Android Storage Access Framework
+- Minimum Android 6.0 (API 23), target Android API 36
 
-The project uses a checked-in Gradle wrapper. On Windows PowerShell:
+## Architecture
+
+```mermaid
+flowchart TD
+    UI[Jetpack Compose UI] --> VM[AppViewModel / StateFlow]
+    VM --> SIM[SimRepository]
+    VM --> SETTINGS[SettingsRepository]
+    VM --> BACKUP[BackupManager]
+    VM --> REMINDER[ReminderScheduler]
+    SIM --> ROOM[(Room / SQLite)]
+    SETTINGS --> DATASTORE[(DataStore)]
+    REMINDER --> WORK[WorkManager]
+    VM --> RATE[ExchangeRateRepository]
+    RATE --> ECB[Public ECB reference rates]
+```
+
+A small application container wires dependencies together without an additional
+dependency-injection framework.
+
+### Data model
+
+| Table | Purpose |
+| --- | --- |
+| `sims` | SIM identity, renewal configuration, and archive state |
+| `renewal_history` | Actual and previous/next dates, amount, currency, and notes; cascade-owned by a SIM |
+| `reminder_state` | Unique `SIM + renewal date + reminder offset` notification records |
+
+Renewal deadlines use `LocalDate`; creation and update metadata use `Instant` to
+avoid timezone shifts in calendar dates.
+
+## Quick start
+
+### Requirements
+
+- Android Studio, or Android SDK API 36 with Build Tools 35.0.0+
+- JDK 17+
+- Git
+
+### Get the source
+
+```bash
+git clone https://github.com/mibgb65-cloud/OmniSIM.git
+cd OmniSIM
+```
+
+### Build a debug APK
+
+Windows PowerShell:
 
 ```powershell
 .\gradlew.bat assembleDebug
 ```
 
-On macOS or Linux:
+macOS or Linux:
 
 ```bash
 ./gradlew assembleDebug
 ```
 
-The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
+The APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 
-## GitHub releases
+### Test and lint
 
-Pushing a semantic version tag runs `.github/workflows/release.yml`. The workflow
-tests and lints the project, builds the minified release variant, verifies that the
-APK is unsigned, and creates a GitHub Release containing the APK and its SHA-256
-checksum. It does not use signing secrets.
+```powershell
+.\gradlew.bat assembleDebug test lint
+```
 
-Before releasing, update `versionCode` and `versionName` in
-`app/build.gradle.kts`, commit the change, and push a tag matching `versionName`:
+Unit tests cover date calculations, status precedence, reminder matching and
+deduplication, rate parsing, cost conversion, backup validation, and history filters.
+
+## Backup and restore
+
+Settings → Data exports and imports JSON through Android's document picker, without
+broad storage permission. Backups contain a `backupVersion`, SIMs, renewal history,
+and relevant settings.
+
+Before confirmation, OmniSIM validates IDs, references, dates, required values,
+amounts, and safe HTTP(S) links. Database replacement runs in a Room transaction;
+invalid input leaves existing data unchanged.
+
+## Notification behavior
+
+OmniSIM schedules one battery-friendly periodic WorkManager task. Default offsets
+are 30, 14, 7, 3, 1, and 0 days plus overdue. Notifications are deduplicated with
+`SIM ID + renewal date + offset`; renewal clears obsolete state and reschedules work.
+
+WorkManager timing is approximate. Doze, battery saver, app standby, and
+manufacturer battery policies may delay background work, so reminders are not
+guaranteed at an exact time.
+
+## Automated releases
+
+Pushing a semantic version tag matching `versionName` triggers the
+[release workflow](.github/workflows/release.yml):
 
 ```bash
+# First update versionCode and versionName in app/build.gradle.kts
 git tag v1.0.1
 git push origin v1.0.1
 ```
 
-The release asset is named `OmniSIM-<version>-release-unsigned.apk`. An unsigned
-APK cannot be installed as a normal production package; sign it with your release
-key before installation or redistribution.
+The workflow:
 
-## Tests and lint
+1. Validates the tag against the app version.
+2. Runs tests and lint.
+3. Builds the R8 release APK.
+4. Verifies that the APK is unsigned and generates a SHA-256 checksum.
+5. Creates a GitHub Release and uploads both files.
 
-```powershell
-.\gradlew.bat test
-.\gradlew.bat lint
-```
-
-Business-logic tests cover renewal-date calculations, status precedence, reminder
-matching/deduplication, and backup validation.
-
-## Architecture
-
-OmniSIM intentionally uses a small architecture:
-
-```text
-Jetpack Compose UI
-        ↓
-AppViewModel + immutable StateFlow state
-        ↓
-SimRepository / SettingsRepository
-        ↓
-Room / DataStore Preferences
-```
-
-A simple application container supplies the database, repositories, backup manager,
-and reminder scheduler. No dependency-injection framework or cloud service is used.
-
-Room stores three tables:
-
-- `sims` — SIM identity and renewal configuration
-- `renewal_history` — actual renewal events, cascade-owned by a SIM
-- `reminder_state` — the unique SIM/date/offset notifications already sent
-
-Renewal deadlines are stored as ISO `LocalDate` values. Only creation/update metadata
-uses `Instant`, avoiding timezone shifts in calendar deadlines.
-
-## Backup and restore
-
-Settings → Data provides JSON export and import. Android's document picker chooses
-the destination/source, so OmniSIM does not need broad storage permission.
-
-Backups contain a `backupVersion`, SIMs, renewal history, and relevant settings.
-Before showing the restore confirmation, OmniSIM parses and validates the complete
-document, including IDs, references, dates, required values, prices, and safe HTTP(S)
-links. Database replacement is a Room transaction; invalid input leaves the current
-data unchanged.
-
-## Notification behavior
-
-OmniSIM schedules one battery-friendly periodic WorkManager job. It checks enabled
-offsets (30, 14, 7, 3, 1, and 0 days plus overdue by default) and records a unique
-`SIM ID + renewal date + offset` marker after notifying. Renewing a SIM clears the
-old markers for that SIM.
-
-WorkManager is deliberately approximate. Android may defer background work because
-of Doze, battery saver, app standby, or manufacturer-specific policies. Notifications
-are therefore date reminders, not guaranteed exact-time alarms. OmniSIM does not
-request exact-alarm permission or run a continuous background service.
+Assets are named `OmniSIM-<version>-release-unsigned.apk`.
 
 ## Contributing
 
-Issues and focused pull requests are welcome. Keep changes within OmniSIM's goal: a
-fast, private, local-first renewal reminder for a small personal SIM collection.
+Focused [issues](https://github.com/mibgb65-cloud/OmniSIM/issues) and pull requests
+are welcome. Keep changes aligned with a lightweight, private, local-first renewal
+manager for a small personal SIM collection.
 
 Before submitting a change, run:
 
@@ -171,9 +222,13 @@ Before submitting a change, run:
 .\gradlew.bat assembleDebug test lint
 ```
 
-Do not add analytics, account systems, cloud infrastructure, or unnecessary
-permissions/dependencies.
+Do not introduce analytics, advertising, account systems, cloud sync, or unnecessary
+permissions and dependencies.
 
 ## License
 
 OmniSIM is released under the [MIT License](LICENSE).
+
+<div align="center">
+  <strong>Never miss a SIM renewal again.</strong>
+</div>
