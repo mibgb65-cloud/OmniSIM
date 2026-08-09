@@ -19,6 +19,7 @@ data class AppReleaseInfo(
     val title: String,
     val notes: String?,
     val apkDownloadUrl: String,
+    val checksumDownloadUrl: String,
 )
 
 fun interface AppUpdateSource {
@@ -72,15 +73,21 @@ internal fun parseGitHubRelease(response: String): AppReleaseInfo {
     val release = GITHUB_JSON.decodeFromString<GitHubReleaseResponse>(response)
     val version = release.tagName.trim().removePrefix("v").removePrefix("V")
     parseVersion(version)
-    val apk = release.assets.firstOrNull { it.name.endsWith("-release.apk", ignoreCase = true) }
-        ?: release.assets.firstOrNull { it.name.endsWith(".apk", ignoreCase = true) }
-        ?: throw IllegalArgumentException("Release APK is missing")
+    val expectedApkName = "OmniSIM-$version-release.apk"
+    val apk = release.assets.singleOrNull { it.name == expectedApkName }
+        ?: throw IllegalArgumentException("Official release APK is missing or ambiguous")
+    val checksum = release.assets.singleOrNull { it.name == "$expectedApkName.sha256" }
+        ?: throw IllegalArgumentException("Release checksum is missing or ambiguous")
     require(isTrustedUpdateDownloadUrl(apk.downloadUrl)) { "Release APK URL is invalid" }
+    require(isTrustedChecksumDownloadUrl(checksum.downloadUrl)) {
+        "Release checksum URL is invalid"
+    }
     return AppReleaseInfo(
         version = version,
         title = release.name?.trim().takeUnless { it.isNullOrEmpty() } ?: "OmniSIM $version",
         notes = release.body?.trim()?.takeIf(String::isNotEmpty)?.take(12_000),
         apkDownloadUrl = apk.downloadUrl,
+        checksumDownloadUrl = checksum.downloadUrl,
     )
 }
 
@@ -96,11 +103,23 @@ internal fun compareVersionNames(first: String, second: String): Int {
     return 0
 }
 
-internal fun isTrustedUpdateDownloadUrl(value: String): Boolean = runCatching {
+internal fun isTrustedUpdateDownloadUrl(value: String): Boolean =
+    isTrustedReleaseAssetUrl(value, suffix = "-release.apk")
+
+internal fun isTrustedChecksumDownloadUrl(value: String): Boolean =
+    isTrustedReleaseAssetUrl(value, suffix = "-release.apk.sha256")
+
+private fun isTrustedReleaseAssetUrl(value: String, suffix: String): Boolean = runCatching {
     val uri = URI(value)
-    uri.scheme.equals("https", ignoreCase = true) &&
+    val pathParts = uri.path.split('/').filter(String::isNotEmpty)
+    val tagVersion = pathParts.getOrNull(4)?.removePrefix("v")?.removePrefix("V")
+    val fileName = pathParts.getOrNull(5)
+    uri.scheme == "https" &&
         uri.host.equals("github.com", ignoreCase = true) &&
-        uri.path.endsWith(".apk", ignoreCase = true)
+        uri.port == -1 && uri.userInfo == null && uri.query == null && uri.fragment == null &&
+        pathParts.take(4) == listOf("mibgb65-cloud", "OmniSIM", "releases", "download") &&
+        tagVersion != null && fileName == "OmniSIM-$tagVersion$suffix" &&
+        runCatching { parseVersion(tagVersion) }.isSuccess
 }.getOrDefault(false)
 
 private fun parseVersion(value: String): List<Int> {

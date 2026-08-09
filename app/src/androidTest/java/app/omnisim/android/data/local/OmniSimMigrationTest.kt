@@ -54,6 +54,37 @@ class OmniSimMigrationTest {
         }
     }
 
+    @Test
+    fun migrationFromTwoToThreeAddsReminderSettingsAndRenewalUndoSnapshot() {
+        helper.createDatabase(DatabaseName, 2).apply {
+            close()
+        }
+
+        helper.runMigrationsAndValidate(
+            DatabaseName,
+            3,
+            true,
+            OmniSimDatabase.MIGRATION_2_3,
+        ).use { database ->
+            database.query("PRAGMA table_info(sims)").use { cursor ->
+                val nameIndex = cursor.getColumnIndexOrThrow("name")
+                val columns = buildSet {
+                    while (cursor.moveToNext()) add(cursor.getString(nameIndex))
+                }
+                assertTrue("remindersEnabled" in columns)
+                assertTrue("reminderOffsets" in columns)
+            }
+            database.query("PRAGMA table_info(renewal_history)").use { cursor ->
+                val nameIndex = cursor.getColumnIndexOrThrow("name")
+                val columns = buildSet {
+                    while (cursor.moveToNext()) add(cursor.getString(nameIndex))
+                }
+                assertTrue("previousNextRenewalDate" in columns)
+                assertTrue("previousRenewalPrice" in columns)
+            }
+        }
+    }
+
     private companion object {
         const val DatabaseName = "migration-test"
     }

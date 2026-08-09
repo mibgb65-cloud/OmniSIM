@@ -14,7 +14,7 @@ class AppUpdateRepositoryTest {
     }
 
     @Test
-    fun parseGitHubRelease_readsNotesAndPrefersReleaseApk() {
+    fun parseGitHubRelease_readsStrictReleaseAssets() {
         val release = parseGitHubRelease(
             """
             {
@@ -29,6 +29,10 @@ class AppUpdateRepositoryTest {
                 {
                   "name": "OmniSIM-1.2.0-release.apk",
                   "browser_download_url": "https://github.com/mibgb65-cloud/OmniSIM/releases/download/v1.2.0/OmniSIM-1.2.0-release.apk"
+                },
+                {
+                  "name": "OmniSIM-1.2.0-release.apk.sha256",
+                  "browser_download_url": "https://github.com/mibgb65-cloud/OmniSIM/releases/download/v1.2.0/OmniSIM-1.2.0-release.apk.sha256"
                 }
               ]
             }
@@ -39,6 +43,7 @@ class AppUpdateRepositoryTest {
         assertEquals("OmniSIM 1.2.0", release.title)
         assertEquals("Fixes and improvements.", release.notes)
         assertTrue(release.apkDownloadUrl.endsWith("OmniSIM-1.2.0-release.apk"))
+        assertTrue(release.checksumDownloadUrl.endsWith("OmniSIM-1.2.0-release.apk.sha256"))
     }
 
     @Test
@@ -56,10 +61,65 @@ class AppUpdateRepositoryTest {
     }
 
     @Test
-    fun trustedDownloadUrl_requiresGitHubHttpsApk() {
-        assertTrue(
+    fun parseGitHubRelease_rejectsDebugOnlyRelease() {
+        val response = """
+            {
+              "tag_name": "v1.2.0",
+              "assets": [
+                {
+                  "name": "OmniSIM-1.2.0-debug.apk",
+                  "browser_download_url": "https://github.com/mibgb65-cloud/OmniSIM/releases/download/v1.2.0/OmniSIM-1.2.0-debug.apk"
+                }
+              ]
+            }
+        """.trimIndent()
+
+        assertThrows(IllegalArgumentException::class.java) {
+            parseGitHubRelease(response)
+        }
+    }
+
+    @Test
+    fun parseGitHubRelease_rejectsMissingChecksum() {
+        val response = """
+            {
+              "tag_name": "v1.2.0",
+              "assets": [
+                {
+                  "name": "OmniSIM-1.2.0-release.apk",
+                  "browser_download_url": "https://github.com/mibgb65-cloud/OmniSIM/releases/download/v1.2.0/OmniSIM-1.2.0-release.apk"
+                }
+              ]
+            }
+        """.trimIndent()
+
+        assertThrows(IllegalArgumentException::class.java) {
+            parseGitHubRelease(response)
+        }
+    }
+
+    @Test
+    fun trustedDownloadUrl_requiresExactOfficialReleasePath() {
+        assertEquals(
+            false,
             isTrustedUpdateDownloadUrl(
                 "https://github.com/mibgb65-cloud/OmniSIM/releases/download/v1.2.0/OmniSIM.apk",
+            ),
+        )
+        assertTrue(
+            isTrustedChecksumDownloadUrl(
+                "https://github.com/mibgb65-cloud/OmniSIM/releases/download/v1.2.0/OmniSIM-1.2.0-release.apk.sha256",
+            ),
+        )
+        assertTrue(
+            isTrustedUpdateDownloadUrl(
+                "https://github.com/mibgb65-cloud/OmniSIM/releases/download/v1.2.0/OmniSIM-1.2.0-release.apk",
+            ),
+        )
+        assertEquals(
+            false,
+            isTrustedUpdateDownloadUrl(
+                "https://github.com/mibgb65-cloud/OmniSIM/releases/download/v1.2.0/OmniSIM-1.2.0-debug.apk",
             ),
         )
         assertEquals(false, isTrustedUpdateDownloadUrl("http://github.com/example.apk"))

@@ -27,6 +27,8 @@ data class SimEntity(
     val currency: String? = null,
     val renewalUrl: String? = null,
     val notes: String? = null,
+    val remindersEnabled: Boolean = true,
+    val reminderOffsets: Set<Int>? = null,
     val archived: Boolean = false,
     val createdAt: Instant,
     val updatedAt: Instant,

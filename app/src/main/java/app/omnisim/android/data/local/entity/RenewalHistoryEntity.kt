@@ -24,10 +24,11 @@ data class RenewalHistoryEntity(
     val simId: String,
     val renewalDate: LocalDate,
     val previousRenewalDate: LocalDate?,
+    val previousNextRenewalDate: LocalDate? = null,
+    val previousRenewalPrice: Double? = null,
     val nextRenewalDate: LocalDate?,
     val amount: Double?,
     val currency: String?,
     val notes: String?,
     val createdAt: Instant,
 )
-

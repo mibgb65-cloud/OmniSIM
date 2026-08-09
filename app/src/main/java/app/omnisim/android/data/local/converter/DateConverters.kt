@@ -16,5 +16,13 @@ class DateConverters {
 
     @TypeConverter
     fun longToInstant(value: Long?): Instant? = value?.let(Instant::ofEpochMilli)
-}
 
+    @TypeConverter
+    fun reminderOffsetsToString(value: Set<Int>?): String? =
+        value?.sortedDescending()?.joinToString(",")
+
+    @TypeConverter
+    fun stringToReminderOffsets(value: String?): Set<Int>? = value?.let { stored ->
+        if (stored.isBlank()) emptySet() else stored.split(',').mapNotNull(String::toIntOrNull).toSet()
+    }
+}

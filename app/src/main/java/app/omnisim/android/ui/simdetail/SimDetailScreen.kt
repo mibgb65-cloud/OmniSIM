@@ -2,20 +2,30 @@ package app.omnisim.android.ui.simdetail
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -34,11 +45,15 @@ import app.omnisim.android.data.local.entity.SimEntity
 import app.omnisim.android.data.preferences.AppSettings
 import app.omnisim.android.domain.util.calculateRenewalStatus
 import app.omnisim.android.domain.util.daysUntilRenewal
+import app.omnisim.android.domain.util.SupportedReminderOffsets
+import app.omnisim.android.domain.util.effectiveReminderOffsets
 import app.omnisim.android.ui.components.RenewalSheet
+import app.omnisim.android.ui.components.RenewalHistoryEditSheet
 import app.omnisim.android.ui.components.OmniPrimaryButton
 import app.omnisim.android.ui.components.OmniSecondaryButton
 import app.omnisim.android.ui.components.OmniSectionHeader
 import app.omnisim.android.ui.components.OmniDialogSystemBars
+import app.omnisim.android.ui.components.OmniSheetHeader
 import app.omnisim.android.ui.components.SimAvatar
 import app.omnisim.android.ui.components.StatusChip
 import app.omnisim.android.ui.components.daysRemainingLabel
@@ -56,6 +71,9 @@ fun SimDetailScreen(
     history: List<RenewalHistoryEntity>,
     settings: AppSettings,
     onRenew: (LocalDate, LocalDate, Double?, String?) -> Unit,
+    onUpdateRenewal: (String, LocalDate, LocalDate, Double?, String?) -> Unit,
+    onUndoRenewal: (String) -> Unit,
+    onReminderSettings: (Boolean, Set<Int>?) -> Unit,
     onOpenWebsite: (String) -> Unit,
     onEdit: () -> Unit,
     onArchive: (Boolean) -> Unit,
@@ -70,8 +88,14 @@ fun SimDetailScreen(
     )
     val remaining = daysUntilRenewal(today, sim.nextRenewalDate)
     var showRenewal by remember { mutableStateOf(false) }
+    var editingRenewal by remember { mutableStateOf<RenewalHistoryEntity?>(null) }
+    var pendingUndo by remember { mutableStateOf<RenewalHistoryEntity?>(null) }
+    var showReminderSettings by remember { mutableStateOf(false) }
     var showArchiveConfirmation by remember { mutableStateOf(false) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
+    val latestHistoryId = remember(history) {
+        history.maxByOrNull(RenewalHistoryEntity::createdAt)?.id
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -160,6 +184,66 @@ fun SimDetailScreen(
                 color = MaterialTheme.colorScheme.surface,
                 shape = MaterialTheme.shapes.large,
             ) {
+                Column(Modifier.padding(OmniCardPadding)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp)
+                            .toggleable(
+                                value = sim.remindersEnabled,
+                                role = Role.Switch,
+                                onValueChange = {
+                                    onReminderSettings(it, sim.reminderOffsets)
+                                },
+                            ),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                stringResource(R.string.sim_reminders),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                when {
+                                    !sim.remindersEnabled -> stringResource(R.string.sim_reminders_disabled)
+                                    sim.reminderOffsets == null -> stringResource(
+                                        R.string.sim_reminders_follow_global,
+                                    )
+                                    else -> pluralStringResource(
+                                        R.plurals.sim_custom_reminder_count,
+                                        sim.reminderOffsets.size,
+                                        sim.reminderOffsets.size,
+                                    )
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(
+                            checked = sim.remindersEnabled,
+                            onCheckedChange = null,
+                        )
+                    }
+                    if (sim.remindersEnabled) {
+                        TextButton(
+                            onClick = { showReminderSettings = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 48.dp),
+                        ) {
+                            Text(stringResource(R.string.configure_sim_reminders))
+                        }
+                    }
+                }
+            }
+        }
+        item {
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                shape = MaterialTheme.shapes.large,
+            ) {
                 Column(
                     Modifier.padding(OmniCardPadding),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -199,7 +283,9 @@ fun SimDetailScreen(
         item {
             TextButton(
                 onClick = { showArchiveConfirmation = true },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp),
             ) {
                 Text(
                     stringResource(
@@ -262,6 +348,17 @@ fun SimDetailScreen(
                             Spacer(Modifier.height(4.dp))
                             Text(it, style = MaterialTheme.typography.bodySmall)
                         }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                        ) {
+                            TextButton(
+                                onClick = { editingRenewal = renewal },
+                                modifier = Modifier.heightIn(min = 48.dp),
+                            ) {
+                                Text(stringResource(R.string.edit_renewal_record))
+                            }
+                        }
                     }
                 }
             }
@@ -270,7 +367,9 @@ fun SimDetailScreen(
             Spacer(Modifier.height(4.dp))
             TextButton(
                 onClick = { showDeleteConfirmation = true },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp),
             ) {
                 Text(
                     stringResource(R.string.action_delete_sim),
@@ -287,6 +386,61 @@ fun SimDetailScreen(
             onConfirm = { actual, next, amount, notes ->
                 onRenew(actual, next, amount, notes)
                 showRenewal = false
+            },
+        )
+    }
+    if (showReminderSettings) {
+        SimReminderSettingsSheet(
+            sim = sim,
+            globalOffsets = settings.reminderOffsets,
+            onDismiss = { showReminderSettings = false },
+            onSave = { offsets ->
+                onReminderSettings(true, offsets)
+                showReminderSettings = false
+            },
+        )
+    }
+    editingRenewal?.let { renewal ->
+        RenewalHistoryEditSheet(
+            history = renewal,
+            currency = renewal.currency ?: sim.currency,
+            canUndo = renewal.id == latestHistoryId && renewal.previousNextRenewalDate != null,
+            onDismiss = { editingRenewal = null },
+            onConfirm = { actual, next, amount, notes ->
+                onUpdateRenewal(renewal.id, actual, next, amount, notes)
+                editingRenewal = null
+            },
+            onUndoRequested = {
+                editingRenewal = null
+                pendingUndo = renewal
+            },
+        )
+    }
+    pendingUndo?.let { renewal ->
+        AlertDialog(
+            onDismissRequest = { pendingUndo = null },
+            title = {
+                OmniDialogSystemBars()
+                Text(stringResource(R.string.undo_renewal_title))
+            },
+            text = { Text(stringResource(R.string.undo_renewal_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onUndoRenewal(renewal.id)
+                        pendingUndo = null
+                    },
+                ) {
+                    Text(
+                        stringResource(R.string.action_confirm_undo),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingUndo = null }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
             },
         )
     }
@@ -355,41 +509,3 @@ fun SimDetailScreen(
         )
     }
 }
-
-@Composable
-private fun SectionTitle(value: String) {
-    OmniSectionHeader(text = value)
-}
-
-@Composable
-private fun InfoRow(label: String, value: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.Top,
-    ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(0.44f),
-        )
-        Text(
-            value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            textAlign = TextAlign.End,
-            modifier = Modifier.weight(0.56f),
-        )
-    }
-}
-
-@Composable
-private fun simTypeLabel(value: String): String = stringResource(
-    if (value == "Physical SIM") R.string.type_physical_sim else R.string.type_esim,
-)
-
-private fun formatAmount(value: Double): String =
-    if (value % 1.0 == 0.0) value.toLong().toString() else "%.2f".format(value)

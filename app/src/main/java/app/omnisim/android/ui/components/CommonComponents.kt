@@ -50,6 +50,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import app.omnisim.android.R
+import app.omnisim.android.data.local.entity.RenewalHistoryEntity
 import app.omnisim.android.data.local.entity.SimEntity
 import app.omnisim.android.domain.model.RenewalStatus
 import app.omnisim.android.domain.util.calculateScheduledNextRenewalDate
@@ -405,6 +406,125 @@ fun RenewalSheet(
                     enabled = amountValid,
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
                 )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RenewalHistoryEditSheet(
+    history: RenewalHistoryEntity,
+    currency: String?,
+    canUndo: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (LocalDate, LocalDate, Double?, String?) -> Unit,
+    onUndoRequested: () -> Unit,
+) {
+    var renewalDate by remember(history.id) { mutableStateOf(history.renewalDate) }
+    var nextRenewalDate by remember(history.id) {
+        mutableStateOf(history.nextRenewalDate ?: history.renewalDate)
+    }
+    var amount by remember(history.id) { mutableStateOf(history.amount?.toString().orEmpty()) }
+    var notes by remember(history.id) { mutableStateOf(history.notes.orEmpty()) }
+    val parsedAmount = amount.toDoubleOrNull()
+    val amountValid = amount.isBlank() ||
+        (parsedAmount != null && parsedAmount.isFinite() && parsedAmount >= 0)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        dragHandle = null,
+        containerColor = MaterialTheme.colorScheme.background,
+        shape = RoundedCornerShape(topStart = 34.dp, topEnd = 34.dp),
+    ) {
+        OmniDialogSystemBars()
+        Column(Modifier.fillMaxSize()) {
+            OmniSheetHeader(
+                title = stringResource(R.string.edit_renewal_record),
+                onClose = onDismiss,
+            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                DateField(
+                    stringResource(R.string.renewal_date),
+                    renewalDate,
+                    { renewalDate = it },
+                )
+                DateField(
+                    stringResource(R.string.next_renewal),
+                    nextRenewalDate,
+                    { nextRenewalDate = it },
+                )
+                OmniTextField(
+                    value = amount,
+                    onValueChange = { amount = it },
+                    label = stringResource(R.string.amount),
+                    prefix = { Text(currency.orEmpty()) },
+                    isError = !amountValid,
+                    supportingText = if (!amountValid) {
+                        { Text(stringResource(R.string.error_non_negative_amount)) }
+                    } else {
+                        null
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OmniTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = stringResource(R.string.notes_optional),
+                    singleLine = false,
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (canUndo) {
+                    Text(
+                        stringResource(R.string.undo_renewal_explanation),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+            Surface(
+                modifier = Modifier.imePadding(),
+                color = MaterialTheme.colorScheme.background,
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    OmniPrimaryButton(
+                        text = stringResource(R.string.action_save_changes),
+                        onClick = {
+                            onConfirm(
+                                renewalDate,
+                                nextRenewalDate,
+                                parsedAmount,
+                                notes.takeIf(String::isNotBlank),
+                            )
+                        },
+                        enabled = amountValid,
+                    )
+                    if (canUndo) {
+                        TextButton(
+                            onClick = onUndoRequested,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                stringResource(R.string.undo_this_renewal),
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
+                }
             }
         }
     }

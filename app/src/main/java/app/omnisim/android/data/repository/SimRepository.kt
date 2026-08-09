@@ -36,6 +36,24 @@ class SimRepository(
         if (archived) dao.deleteReminderStatesForSim(id)
     }
 
+    suspend fun setReminderSettings(
+        id: String,
+        enabled: Boolean,
+        offsets: Set<Int>?,
+    ) {
+        database.withTransaction {
+            val existing = dao.getSim(id) ?: return@withTransaction
+            dao.upsertSim(
+                existing.copy(
+                    remindersEnabled = enabled,
+                    reminderOffsets = offsets,
+                    updatedAt = Instant.now(clock),
+                ),
+            )
+            dao.deleteReminderStatesForSim(id)
+        }
+    }
+
     suspend fun delete(id: String) = dao.deleteSim(id)
 
     suspend fun recordRenewal(
@@ -54,6 +72,8 @@ class SimRepository(
                     simId = sim.id,
                     renewalDate = renewalDate,
                     previousRenewalDate = sim.lastRenewalDate,
+                    previousNextRenewalDate = sim.nextRenewalDate,
+                    previousRenewalPrice = sim.renewalPrice,
                     nextRenewalDate = nextRenewalDate,
                     amount = amount,
                     currency = sim.currency,
@@ -67,6 +87,60 @@ class SimRepository(
                     nextRenewalDate = nextRenewalDate,
                     renewalPrice = amount ?: sim.renewalPrice,
                     updatedAt = now,
+                ),
+            )
+            dao.deleteReminderStatesForSim(sim.id)
+        }
+    }
+
+    suspend fun updateRenewal(
+        historyId: String,
+        renewalDate: LocalDate,
+        nextRenewalDate: LocalDate,
+        amount: Double?,
+        notes: String?,
+    ) {
+        database.withTransaction {
+            val history = dao.getHistory(historyId) ?: error("Renewal history not found")
+            val sim = dao.getSim(history.simId) ?: error("SIM not found")
+            val latest = dao.getLatestHistoryForSim(sim.id)
+            dao.updateHistory(
+                history.copy(
+                    renewalDate = renewalDate,
+                    nextRenewalDate = nextRenewalDate,
+                    amount = amount,
+                    notes = notes,
+                ),
+            )
+            if (latest?.id == history.id) {
+                dao.upsertSim(
+                    sim.copy(
+                        lastRenewalDate = renewalDate,
+                        nextRenewalDate = nextRenewalDate,
+                        renewalPrice = amount ?: sim.renewalPrice,
+                        updatedAt = Instant.now(clock),
+                    ),
+                )
+                dao.deleteReminderStatesForSim(sim.id)
+            }
+        }
+    }
+
+    suspend fun undoLatestRenewal(historyId: String) {
+        database.withTransaction {
+            val history = dao.getHistory(historyId) ?: error("Renewal history not found")
+            val previousNextRenewalDate = history.previousNextRenewalDate
+                ?: error("Renewal cannot be safely undone")
+            val latest = dao.getLatestHistoryForSim(history.simId)
+            require(latest?.id == history.id) { "Only the latest renewal can be undone" }
+            val sim = dao.getSim(history.simId) ?: error("SIM not found")
+            dao.deleteHistory(history.id)
+            dao.upsertSim(
+                sim.copy(
+                    lastRenewalDate = history.previousRenewalDate,
+                    nextRenewalDate = previousNextRenewalDate,
+                    renewalPrice = history.previousRenewalPrice,
+                    updatedAt = Instant.now(clock),
                 ),
             )
             dao.deleteReminderStatesForSim(sim.id)

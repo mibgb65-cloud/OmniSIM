@@ -11,7 +11,7 @@ import org.junit.Test
 
 class BackupCodecTest {
     private val sim = SimEntity(
-        id = "sim-1",
+        id = "4e4ef15a-5c1e-4f31-a37c-5e84217f0ce8",
         name = "Tello",
         carrier = "Tello",
         countryCode = "US",
@@ -28,7 +28,7 @@ class BackupCodecTest {
         updatedAt = Instant.parse("2026-08-01T00:00:00Z"),
     )
     private val renewal = RenewalHistoryEntity(
-        id = "renewal-1",
+        id = "c0457ebb-7484-4c8f-92df-69d7e292dab7",
         simId = sim.id,
         renewalDate = LocalDate.of(2026, 5, 12),
         previousRenewalDate = null,
@@ -64,7 +64,7 @@ class BackupCodecTest {
     @Test
     fun `unsupported backup version is rejected`() {
         val encoded = BackupCodec.encode(listOf(sim), emptyList(), AppSettings())
-            .replace("\"backupVersion\": 2", "\"backupVersion\": 99")
+            .replace("\"backupVersion\": 3", "\"backupVersion\": 99")
         assertThrows(BackupValidationException::class.java) {
             BackupCodec.decode(encoded)
         }
@@ -73,8 +73,10 @@ class BackupCodecTest {
     @Test
     fun `version one backup remains supported`() {
         val encoded = BackupCodec.encode(listOf(sim), emptyList(), AppSettings())
-            .replace("\"backupVersion\": 2", "\"backupVersion\": 1")
+            .replace("\"backupVersion\": 3", "\"backupVersion\": 1")
             .replace("        \"renewalDayOfMonth\": null,\n", "")
+            .replace("        \"remindersEnabled\": true,\n", "")
+            .replace("        \"reminderOffsets\": null,\n", "")
 
         assertEquals(sim, BackupCodec.decode(encoded).sims.single())
     }
@@ -126,6 +128,54 @@ class BackupCodecTest {
     fun `unsafe renewal website is rejected`() {
         val encoded = BackupCodec.encode(listOf(sim), emptyList(), AppSettings())
             .replace("https://tello.com/account", "javascript:alert(1)")
+        assertThrows(BackupValidationException::class.java) {
+            BackupCodec.decode(encoded)
+        }
+    }
+
+    @Test
+    fun `non UUID identifiers are rejected`() {
+        val encoded = BackupCodec.encode(listOf(sim.copy(id = "sim-1")), emptyList(), AppSettings())
+
+        assertThrows(BackupValidationException::class.java) {
+            BackupCodec.decode(encoded)
+        }
+    }
+
+    @Test
+    fun `unsupported currencies are rejected`() {
+        val encoded = BackupCodec.encode(
+            listOf(sim.copy(currency = "ZZZ")),
+            emptyList(),
+            AppSettings(),
+        )
+
+        assertThrows(BackupValidationException::class.java) {
+            BackupCodec.decode(encoded)
+        }
+    }
+
+    @Test
+    fun `unsupported reminder offsets are rejected`() {
+        val encoded = BackupCodec.encode(
+            listOf(sim),
+            emptyList(),
+            AppSettings(reminderOffsets = setOf(14, 2)),
+        )
+
+        assertThrows(BackupValidationException::class.java) {
+            BackupCodec.decode(encoded)
+        }
+    }
+
+    @Test
+    fun `out of range warning period is rejected`() {
+        val encoded = BackupCodec.encode(
+            listOf(sim),
+            emptyList(),
+            AppSettings(warningPeriodDays = 1_000),
+        )
+
         assertThrows(BackupValidationException::class.java) {
             BackupCodec.decode(encoded)
         }

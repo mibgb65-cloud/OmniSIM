@@ -5,7 +5,9 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import app.omnisim.android.OmniSimApplication
 import app.omnisim.android.data.local.entity.ReminderStateEntity
+import app.omnisim.android.data.local.entity.SimEntity
 import app.omnisim.android.domain.util.daysUntilRenewal
+import app.omnisim.android.domain.util.effectiveReminderOffsets
 import java.time.Instant
 import java.time.LocalDate
 import kotlinx.coroutines.flow.first
@@ -17,18 +19,23 @@ class RenewalWorker(
     override suspend fun doWork(): Result = runCatching {
         val application = applicationContext as OmniSimApplication
         val helper = NotificationHelper(applicationContext)
-        if (!helper.notificationsEnabled()) return Result.success()
+        val settingsRepository = application.container.settingsRepository
+        if (!helper.notificationsEnabled()) {
+            settingsRepository.recordReminderCheck(Instant.now())
+            return Result.success()
+        }
 
         val dao = application.container.database.dao()
-        val settings = application.container.settingsRepository.settings.first()
+        val settings = settingsRepository.settings.first()
         val today = LocalDate.now()
         val sent = dao.getAllReminderStates().map {
             ReminderKey(it.simId, it.renewalDate, it.reminderOffset)
         }.toSet()
 
-        dao.getActiveSims().forEach { sim ->
+        dao.getActiveSims().filter(SimEntity::remindersEnabled).forEach { sim ->
             val remaining = daysUntilRenewal(today, sim.nextRenewalDate)
-            val offset = matchedReminderOffset(remaining, settings.reminderOffsets) ?: return@forEach
+            val offsets = effectiveReminderOffsets(sim.reminderOffsets, settings.reminderOffsets)
+            val offset = matchedReminderOffset(remaining, offsets) ?: return@forEach
             val key = ReminderKey(sim.id, sim.nextRenewalDate, offset)
             if (shouldSendReminder(key, sent)) {
                 if (helper.show(sim, remaining, settings.maskPhoneNumbers)) {
@@ -38,6 +45,7 @@ class RenewalWorker(
                 }
             }
         }
+        settingsRepository.recordReminderCheck(Instant.now())
         Result.success()
     }.getOrElse { Result.retry() }
 }

@@ -18,6 +18,7 @@ import app.omnisim.android.data.preferences.ThemeMode
 import app.omnisim.android.data.update.AppReleaseInfo
 import app.omnisim.android.data.update.compareVersionNames
 import app.omnisim.android.domain.util.isSupportedCurrencyCode
+import app.omnisim.android.domain.util.areReminderOffsetsValid
 import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
@@ -37,9 +38,16 @@ data class AppUiState(
     val sims: List<SimEntity> = emptyList(),
     val history: List<RenewalHistoryEntity> = emptyList(),
     val settings: AppSettings = AppSettings(),
+    val legalConsentVersion: Int = 0,
     val isLoading: Boolean = true,
     val pendingRestore: BackupPayload? = null,
+    val recoverySnapshotAvailable: Boolean = false,
     val exchangeRates: ExchangeRateUiState = ExchangeRateUiState.Idle,
+)
+
+private data class RestoreUiState(
+    val pendingRestore: BackupPayload?,
+    val recoverySnapshotAvailable: Boolean,
 )
 
 sealed interface ExchangeRateUiState {
@@ -117,6 +125,9 @@ fun validateSimDraft(draft: SimDraft): SimDraftValidationError? = when {
 
 class AppViewModel(private val container: AppContainer) : ViewModel() {
     private val pendingRestore = MutableStateFlow<BackupPayload?>(null)
+    private val recoverySnapshotAvailable = MutableStateFlow(
+        container.backupManager.hasRecoverySnapshot(),
+    )
     private val exchangeRates = MutableStateFlow<ExchangeRateUiState>(ExchangeRateUiState.Idle)
     private val messagesChannel = Channel<UiMessage>(Channel.BUFFERED)
     private val _appUpdateState = MutableStateFlow<AppUpdateUiState>(AppUpdateUiState.Idle)
@@ -127,19 +138,31 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     val messages = messagesChannel.receiveAsFlow()
     val appUpdateState: StateFlow<AppUpdateUiState> = _appUpdateState.asStateFlow()
 
+    private val settingsWithConsent = combine(
+        container.settingsRepository.settings,
+        container.settingsRepository.legalConsentVersion,
+    ) { settings, legalConsentVersion -> settings to legalConsentVersion }
+    private val restoreState = combine(
+        pendingRestore,
+        recoverySnapshotAvailable,
+        ::RestoreUiState,
+    )
+
     val uiState: StateFlow<AppUiState> = combine(
         container.simRepository.observeSims(),
         container.simRepository.observeHistory(),
-        container.settingsRepository.settings,
-        pendingRestore,
+        settingsWithConsent,
+        restoreState,
         exchangeRates,
-    ) { sims, history, settings, restore, rates ->
+    ) { sims, history, settingsAndConsent, restore, rates ->
         AppUiState(
             sims = sims,
             history = history,
-            settings = settings,
+            settings = settingsAndConsent.first,
+            legalConsentVersion = settingsAndConsent.second,
             isLoading = false,
-            pendingRestore = restore,
+            pendingRestore = restore.pendingRestore,
+            recoverySnapshotAvailable = restore.recoverySnapshotAvailable,
             exchangeRates = rates,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppUiState())
@@ -223,6 +246,10 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         _appUpdateState.value = AppUpdateUiState.Idle
     }
 
+    fun acceptLegalConsent() = launchSettings {
+        container.settingsRepository.acceptCurrentLegalConsent()
+    }
+
     fun saveSim(draft: SimDraft, onResult: (Boolean) -> Unit) {
         val error = validateSimDraft(draft)
         if (error != null) {
@@ -257,7 +284,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
                         updatedAt = now,
                     ),
                 )
-                container.reminderScheduler.schedule()
+                scheduleAndCheckReminders()
             }
             if (result.isSuccess) {
                 messagesChannel.send(UiMessage(R.string.message_sim_saved))
@@ -283,7 +310,32 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
             amount,
             notes.nullIfBlank(),
         )
-        container.reminderScheduler.schedule()
+        scheduleAndCheckReminders()
+    }
+
+    fun updateRenewal(
+        historyId: String,
+        renewalDate: LocalDate,
+        nextRenewalDate: LocalDate,
+        amount: Double?,
+        notes: String?,
+    ) = launchAction(R.string.message_renewal_updated, R.string.message_renewal_update_failed) {
+        container.simRepository.updateRenewal(
+            historyId = historyId,
+            renewalDate = renewalDate,
+            nextRenewalDate = nextRenewalDate,
+            amount = amount,
+            notes = notes.nullIfBlank(),
+        )
+        scheduleAndCheckReminders()
+    }
+
+    fun undoRenewal(historyId: String) = launchAction(
+        R.string.message_renewal_undone,
+        R.string.message_renewal_undo_failed,
+    ) {
+        container.simRepository.undoLatestRenewal(historyId)
+        scheduleAndCheckReminders()
     }
 
     fun setArchived(id: String, archived: Boolean) = launchAction(
@@ -291,7 +343,21 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         R.string.message_sim_update_failed,
     ) {
         container.simRepository.setArchived(id, archived)
-        container.reminderScheduler.schedule()
+        scheduleAndCheckReminders()
+    }
+
+    fun setSimReminderSettings(id: String, enabled: Boolean, offsets: Set<Int>?) {
+        if (!areReminderOffsetsValid(offsets)) {
+            messagesChannel.trySend(UiMessage(R.string.message_setting_failed))
+            return
+        }
+        launchAction(
+            R.string.message_sim_reminders_saved,
+            R.string.message_setting_failed,
+        ) {
+            container.simRepository.setReminderSettings(id, enabled, offsets)
+            scheduleAndCheckReminders()
+        }
     }
 
     fun delete(id: String) = launchAction(
@@ -309,7 +375,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     }
     fun setReminderOffsets(value: Set<Int>) = launchSettings {
         container.settingsRepository.setReminderOffsets(value)
-        container.reminderScheduler.schedule()
+        scheduleAndCheckReminders()
     }
     fun setDefaultCurrency(value: String) = launchSettings {
         container.settingsRepository.setDefaultCurrency(value)
@@ -321,6 +387,13 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         R.string.message_backup_export_failed,
     ) {
         container.backupManager.export(uri)
+    }
+
+    fun exportHistoryCsv(uri: Uri) = launchAction(
+        R.string.message_history_csv_exported,
+        R.string.message_history_csv_export_failed,
+    ) {
+        container.backupManager.exportHistoryCsv(uri)
     }
 
     fun prepareRestore(uri: Uri) {
@@ -337,13 +410,49 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         pendingRestore.value = null
     }
 
+    fun prepareRecoveryRestore() {
+        viewModelScope.launch {
+            runCatching { container.backupManager.readRecoverySnapshot() }
+                .onSuccess { payload ->
+                    if (payload == null) {
+                        recoverySnapshotAvailable.value = false
+                        messagesChannel.send(UiMessage(R.string.message_recovery_snapshot_missing))
+                    } else {
+                        pendingRestore.value = payload
+                    }
+                }
+                .onFailure {
+                    messagesChannel.send(UiMessage(R.string.message_restore_failed))
+                }
+        }
+    }
+
     fun confirmRestore() {
         val payload = pendingRestore.value ?: return
         pendingRestore.value = null
         launchAction(R.string.message_backup_restored, R.string.message_restore_failed) {
             container.backupManager.restore(payload)
-            container.reminderScheduler.schedule()
+            recoverySnapshotAvailable.value = true
+            scheduleAndCheckReminders()
         }
+    }
+
+    fun checkRemindersNow() {
+        scheduleAndCheckReminders()
+    }
+
+    fun sendTestNotification() {
+        val message = if (container.notificationHelper.showTest()) {
+            R.string.message_test_notification_sent
+        } else {
+            R.string.message_test_notification_blocked
+        }
+        messagesChannel.trySend(UiMessage(message))
+    }
+
+    private fun scheduleAndCheckReminders() {
+        container.reminderScheduler.schedule()
+        container.reminderScheduler.checkNow()
     }
 
     private fun launchSettings(block: suspend () -> Unit) {

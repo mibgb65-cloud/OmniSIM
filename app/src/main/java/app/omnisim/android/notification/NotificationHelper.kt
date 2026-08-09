@@ -33,7 +33,49 @@ class NotificationHelper(private val context: Context) {
         }
     }
 
-    fun notificationsEnabled(): Boolean = NotificationManagerCompat.from(context).areNotificationsEnabled()
+    fun availability(): NotificationAvailability {
+        val runtimePermissionGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        val appNotificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
+        val channelEnabled = Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
+            context.getSystemService(NotificationManager::class.java)
+                .getNotificationChannel(CHANNEL_ID)
+                ?.importance != NotificationManager.IMPORTANCE_NONE
+        return NotificationAvailability(
+            runtimePermissionGranted = runtimePermissionGranted,
+            appNotificationsEnabled = appNotificationsEnabled,
+            channelEnabled = channelEnabled,
+        )
+    }
+
+    fun notificationsEnabled(): Boolean = availability().canPost
+
+    fun showTest(): Boolean {
+        if (!notificationsEnabled()) return false
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            TEST_NOTIFICATION_ID,
+            Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle(context.getString(R.string.test_notification_title))
+            .setContentText(context.getString(R.string.test_notification_body))
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .build()
+        return try {
+            NotificationManagerCompat.from(context).notify(TEST_NOTIFICATION_ID, notification)
+            true
+        } catch (_: SecurityException) {
+            false
+        }
+    }
 
     fun show(sim: SimEntity, daysRemaining: Long, maskPhoneNumbers: Boolean): Boolean {
         if (
@@ -93,5 +135,15 @@ class NotificationHelper(private val context: Context) {
 
     companion object {
         const val CHANNEL_ID = "renewal_reminders"
+        private const val TEST_NOTIFICATION_ID = 0x4F4D4E49
     }
+}
+
+data class NotificationAvailability(
+    val runtimePermissionGranted: Boolean,
+    val appNotificationsEnabled: Boolean,
+    val channelEnabled: Boolean,
+) {
+    val canPost: Boolean
+        get() = runtimePermissionGranted && appNotificationsEnabled && channelEnabled
 }

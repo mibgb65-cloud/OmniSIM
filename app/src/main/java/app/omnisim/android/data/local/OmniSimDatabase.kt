@@ -14,7 +14,7 @@ import app.omnisim.android.data.local.entity.SimEntity
 
 @Database(
     entities = [SimEntity::class, RenewalHistoryEntity::class, ReminderStateEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 @TypeConverters(DateConverters::class)
@@ -27,10 +27,25 @@ abstract class OmniSimDatabase : RoomDatabase() {
                 context.applicationContext,
                 OmniSimDatabase::class.java,
                 "omnisim.db",
-            ).addMigrations(MIGRATION_1_2).build()
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
 
         val MIGRATION_1_2 = Migration(1, 2) { database ->
             database.execSQL("ALTER TABLE sims ADD COLUMN renewalDayOfMonth INTEGER")
+        }
+
+        val MIGRATION_2_3 = Migration(2, 3) { database ->
+            database.execSQL(
+                "ALTER TABLE sims ADD COLUMN remindersEnabled INTEGER NOT NULL DEFAULT 1",
+            )
+            database.execSQL(
+                "ALTER TABLE sims ADD COLUMN reminderOffsets TEXT",
+            )
+            database.execSQL(
+                "ALTER TABLE renewal_history ADD COLUMN previousNextRenewalDate TEXT",
+            )
+            database.execSQL(
+                "ALTER TABLE renewal_history ADD COLUMN previousRenewalPrice REAL",
+            )
         }
     }
 }

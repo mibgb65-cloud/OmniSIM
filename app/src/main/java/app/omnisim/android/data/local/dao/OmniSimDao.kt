@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
+import androidx.room.Update
 import app.omnisim.android.data.local.entity.ReminderStateEntity
 import app.omnisim.android.data.local.entity.RenewalHistoryEntity
 import app.omnisim.android.data.local.entity.SimEntity
@@ -34,6 +35,15 @@ abstract class OmniSimDao {
     @Query("SELECT * FROM sims WHERE id = :id LIMIT 1")
     abstract suspend fun getSim(id: String): SimEntity?
 
+    @Query("SELECT * FROM renewal_history WHERE id = :id LIMIT 1")
+    abstract suspend fun getHistory(id: String): RenewalHistoryEntity?
+
+    @Query(
+        "SELECT * FROM renewal_history WHERE simId = :simId " +
+            "ORDER BY createdAt DESC LIMIT 1",
+    )
+    abstract suspend fun getLatestHistoryForSim(simId: String): RenewalHistoryEntity?
+
     @Upsert
     abstract suspend fun upsertSim(sim: SimEntity)
 
@@ -45,6 +55,9 @@ abstract class OmniSimDao {
 
     @Insert
     abstract suspend fun insertHistory(history: List<RenewalHistoryEntity>)
+
+    @Update
+    abstract suspend fun updateHistory(history: RenewalHistoryEntity)
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     abstract suspend fun insertReminderState(state: ReminderStateEntity): Long
@@ -60,6 +73,9 @@ abstract class OmniSimDao {
 
     @Query("DELETE FROM renewal_history")
     abstract suspend fun clearHistory()
+
+    @Query("DELETE FROM renewal_history WHERE id = :id")
+    abstract suspend fun deleteHistory(id: String)
 
     @Query("DELETE FROM sims")
     abstract suspend fun clearSims()
@@ -81,4 +97,3 @@ abstract class OmniSimDao {
         insertReminderStates(reminderStates)
     }
 }
-

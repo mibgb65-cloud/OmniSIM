@@ -35,4 +35,39 @@ jobs:
       - name: Verify project
         run: |
           chmod +x ./gradlew
-          ./gradlew --no-daemon test lint assembleDebug
+          ./gradlew --no-daemon checkCodeFileLength test lint assembleDebug
+
+  instrumented-tests:
+    name: Instrumented tests (API 35)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run instrumented tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: default
+          arch: x86_64
+          profile: pixel_7
+          script: |
+            chmod +x ./gradlew
+            ./gradlew --no-daemon connectedDebugAndroidTest

@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -22,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -33,8 +36,7 @@ import app.omnisim.android.ui.theme.OmniScreenPadding
 
 enum class OmniPageTitleStyle {
     Centered,
-    LargeStart,
-    CompactLargeStart,
+    Bubble,
 }
 
 @Composable
@@ -52,14 +54,24 @@ fun OmniPageSurface(
         color = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.onBackground,
     ) {
-        Column(Modifier.fillMaxSize()) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .then(
+                    if (titleStyle == OmniPageTitleStyle.Bubble) {
+                        Modifier.omniPrimaryPageBackground()
+                    } else {
+                        Modifier
+                    },
+                ),
+        ) {
             OmniPageHeader(
                 title = title,
                 navigationIcon = navigationIcon,
                 onNavigate = onNavigate,
                 titleStyle = titleStyle,
                 action = action,
-                frosted = true,
+                frosted = titleStyle != OmniPageTitleStyle.Bubble,
             )
             Box(
                 modifier = Modifier
@@ -72,6 +84,15 @@ fun OmniPageSurface(
 }
 
 @Composable
+fun Modifier.omniPrimaryPageBackground(): Modifier = background(
+    Brush.verticalGradient(
+        0f to MaterialTheme.colorScheme.primaryContainer,
+        0.62f to MaterialTheme.colorScheme.background,
+        1f to MaterialTheme.colorScheme.background,
+    ),
+)
+
+@Composable
 fun OmniPageHeader(
     title: String,
     navigationIcon: ImageVector? = null,
@@ -80,15 +101,20 @@ fun OmniPageHeader(
     action: (@Composable BoxScope.() -> Unit)? = null,
     frosted: Boolean = false,
 ) {
-    val largeStart = titleStyle != OmniPageTitleStyle.Centered && navigationIcon == null
     val headerHeight = when (titleStyle) {
         OmniPageTitleStyle.Centered -> 78.dp
-        OmniPageTitleStyle.LargeStart -> 112.dp
-        OmniPageTitleStyle.CompactLargeStart -> 92.dp
+        OmniPageTitleStyle.Bubble -> 84.dp
     }
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .then(
+                if (titleStyle == OmniPageTitleStyle.Bubble) {
+                    Modifier.statusBarsPadding()
+                } else {
+                    Modifier
+                },
+            )
             .height(headerHeight)
             .background(
                 if (frosted) {
@@ -98,7 +124,7 @@ fun OmniPageHeader(
                 },
             )
             .padding(horizontal = OmniScreenPadding),
-        contentAlignment = if (largeStart) Alignment.CenterStart else Alignment.Center,
+        contentAlignment = Alignment.Center,
     ) {
         if (navigationIcon != null && onNavigate != null) {
             OmniCircleIconButton(
@@ -112,15 +138,36 @@ fun OmniPageHeader(
                 )
             }
         }
-        Text(
-            title,
-            style = if (largeStart) {
-                MaterialTheme.typography.headlineLarge
-            } else {
-                MaterialTheme.typography.titleLarge
-            },
-            fontWeight = FontWeight.Bold,
-        )
+        if (titleStyle == OmniPageTitleStyle.Bubble) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .height(56.dp)
+                    .widthIn(max = 300.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                shape = CircleShape,
+            ) {
+                Box(
+                    modifier = Modifier.padding(horizontal = 28.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        } else {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+            )
+        }
         action?.let {
             Box(
                 modifier = Modifier.align(Alignment.CenterEnd),
@@ -151,12 +198,12 @@ fun OmniCircleIconButton(
         modifier = modifier.size(50.dp),
         shape = CircleShape,
         color = if (emphasized) {
-            MaterialTheme.colorScheme.primary
+            OmniAccentYellow
         } else {
             MaterialTheme.colorScheme.surface
         },
         contentColor = if (emphasized) {
-            MaterialTheme.colorScheme.onPrimary
+            androidx.compose.ui.graphics.Color(0xFF171717)
         } else {
             MaterialTheme.colorScheme.onSurface
         },

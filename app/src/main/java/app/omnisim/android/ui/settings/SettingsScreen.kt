@@ -27,9 +27,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -50,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
@@ -58,11 +60,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.os.ConfigurationCompat
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import app.omnisim.android.BuildConfig
 import app.omnisim.android.R
 import app.omnisim.android.backup.BackupPayload
 import app.omnisim.android.data.preferences.AppSettings
 import app.omnisim.android.data.preferences.ThemeMode
+import app.omnisim.android.notification.NotificationAvailability
+import app.omnisim.android.notification.NotificationHelper
 import app.omnisim.android.ui.components.OmniDialogSystemBars
 import app.omnisim.android.ui.components.CurrencyPickerField
 import app.omnisim.android.ui.components.omniTextFieldColors
@@ -71,15 +77,24 @@ import app.omnisim.android.ui.theme.OmniCardPadding
 import app.omnisim.android.ui.theme.OmniScreenPadding
 import app.omnisim.android.ui.theme.OmniSectionSpacing
 import java.time.LocalDate
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 
 private val warningPeriods = listOf(3, 7, 14, 30)
-private val reminderOptions = listOf(30, 14, 7, 3, 1, 0, -1)
+private val advanceReminderOptions = listOf(30, 14, 7, 3, 1)
+private val dueReminderOptions = listOf(0, -1)
+private val reminderOptions = advanceReminderOptions + dueReminderOptions
+
 
 @Composable
 fun SettingsScreen(
+    section: SettingsSection,
     settings: AppSettings,
     appLanguage: AppLanguage,
     pendingRestore: BackupPayload?,
+    recoverySnapshotAvailable: Boolean,
     onThemeMode: (ThemeMode) -> Unit,
     onAppLanguage: (AppLanguage) -> Unit,
     onDynamicColor: (Boolean) -> Unit,
@@ -88,12 +103,19 @@ fun SettingsScreen(
     onReminderOffsets: (Set<Int>) -> Unit,
     onDefaultCurrency: (String) -> Unit,
     onExport: (android.net.Uri) -> Unit,
+    onExportHistoryCsv: (android.net.Uri) -> Unit,
     onImport: (android.net.Uri) -> Unit,
+    onPrepareRecoveryRestore: () -> Unit,
     onConfirmRestore: () -> Unit,
     onCancelRestore: () -> Unit,
+    onNotificationsEnabled: () -> Unit,
+    onSendTestNotification: () -> Unit,
+    onOpenNotificationSettings: () -> Unit,
+    onOpenLegalDocuments: () -> Unit,
     onOpenPrivacyPermissions: () -> Unit,
     onOpenUsageGuide: () -> Unit,
     onCheckForUpdates: () -> Unit,
+    onOpenSection: (SettingsSection) -> Unit,
     bottomContentPadding: Dp,
 ) {
     val context = LocalContext.current
@@ -105,15 +127,30 @@ fun SettingsScreen(
                 PackageManager.PERMISSION_GRANTED,
         )
     }
+    var notificationAvailability by remember {
+        mutableStateOf(NotificationHelper(context).availability())
+    }
+    LifecycleResumeEffect(context) {
+        notificationAvailability = NotificationHelper(context).availability()
+        permissionGranted = notificationAvailability.runtimePermissionGranted
+        onPauseOrDispose { }
+    }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { permissionGranted = it }
+    ) { granted ->
+        permissionGranted = granted
+        notificationAvailability = NotificationHelper(context).availability()
+        if (granted) onNotificationsEnabled()
+    }
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
     ) { uri -> uri?.let(onExport) }
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri -> uri?.let(onImport) }
+    val csvExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv"),
+    ) { uri -> uri?.let(onExportHistoryCsv) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -125,6 +162,42 @@ fun SettingsScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        if (section == SettingsSection.Overview) {
+            item {
+                SettingsActionCard(
+                    title = stringResource(R.string.settings_appearance_and_language),
+                    description = stringResource(R.string.settings_appearance_and_language_description),
+                    leadingIcon = Icons.Default.Settings,
+                    onClick = { onOpenSection(SettingsSection.Appearance) },
+                )
+            }
+            item {
+                SettingsActionCard(
+                    title = stringResource(R.string.settings_renewal_and_notifications),
+                    description = stringResource(R.string.settings_renewal_and_notifications_description),
+                    leadingIcon = Icons.Default.Notifications,
+                    onClick = { onOpenSection(SettingsSection.Renewal) },
+                )
+            }
+            item {
+                SettingsActionCard(
+                    title = stringResource(R.string.settings_data_and_privacy),
+                    description = stringResource(R.string.settings_data_and_privacy_description),
+                    leadingIcon = Icons.Default.Lock,
+                    onClick = { onOpenSection(SettingsSection.DataPrivacy) },
+                )
+            }
+            item {
+                SettingsActionCard(
+                    title = stringResource(R.string.settings_help_about),
+                    description = stringResource(R.string.settings_help_about_description),
+                    leadingIcon = Icons.Default.Info,
+                    onClick = { onOpenSection(SettingsSection.HelpAbout) },
+                )
+            }
+        }
+
+        if (section == SettingsSection.Appearance) {
         item { SectionTitle(stringResource(R.string.settings_appearance)) }
         item {
             SettingsCard {
@@ -181,7 +254,9 @@ fun SettingsScreen(
                 }
             }
         }
+        }
 
+        if (section == SettingsSection.Renewal) {
         item { SectionTitle(stringResource(R.string.settings_renewal)) }
         item {
             SettingsCard {
@@ -231,7 +306,9 @@ fun SettingsScreen(
                 }
             }
         }
+        }
 
+        if (section == SettingsSection.DataPrivacy) {
         item { SectionTitle(stringResource(R.string.settings_privacy)) }
         item {
             SettingsCard {
@@ -243,7 +320,9 @@ fun SettingsScreen(
                 )
             }
         }
+        }
 
+        if (section == SettingsSection.Renewal) {
         item { SectionTitle(stringResource(R.string.settings_notifications)) }
         if (!permissionGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             item {
@@ -278,22 +357,63 @@ fun SettingsScreen(
             }
         }
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                reminderOptions.forEach { offset ->
-                    val checked = offset in settings.reminderOffsets
-                    ReminderSettingCard(
-                        label = reminderLabel(offset),
-                        checked = checked,
-                        onToggle = {
-                            onReminderOffsets(
-                                if (checked) settings.reminderOffsets - offset
-                                else settings.reminderOffsets + offset,
-                            )
+            NotificationHealthCard(
+                availability = notificationAvailability,
+                lastReminderCheckAt = settings.lastReminderCheckAt,
+                onSendTestNotification = onSendTestNotification,
+                onOpenNotificationSettings = onOpenNotificationSettings,
+            )
+        }
+        item {
+            SettingsCard {
+                val allSelected = reminderOptions.all(settings.reminderOffsets::contains)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.reminder_timing),
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        Text(
+                            stringResource(R.string.reminder_timing_description),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    TextButton(
+                        onClick = {
+                            onReminderOffsets(if (allSelected) emptySet() else reminderOptions.toSet())
                         },
-                    )
+                    ) {
+                        Text(
+                            stringResource(
+                                if (allSelected) R.string.action_clear_all
+                                else R.string.action_select_all,
+                            ),
+                        )
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                ReminderChipGroup(
+                    title = stringResource(R.string.reminder_before_renewal),
+                    options = advanceReminderOptions,
+                    selected = settings.reminderOffsets,
+                    onSelectionChanged = onReminderOffsets,
+                    label = { offset -> stringResource(R.string.days_short, offset) },
+                )
+                HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                ReminderChipGroup(
+                    title = stringResource(R.string.reminder_due_and_overdue),
+                    options = dueReminderOptions,
+                    selected = settings.reminderOffsets,
+                    onSelectionChanged = onReminderOffsets,
+                    label = { offset -> reminderLabel(offset) },
+                )
                 }
             }
-        }
 
         item { SectionTitle(stringResource(R.string.settings_currency)) }
         item {
@@ -306,8 +426,40 @@ fun SettingsScreen(
                 )
             }
         }
+        }
 
+        if (section == SettingsSection.DataPrivacy) {
         item { SectionTitle(stringResource(R.string.settings_data)) }
+        item {
+            val lastBackupAt = settings.lastBackupAt
+            val backupIsStale = lastBackupAt == null ||
+                lastBackupAt.plusSeconds(30L * 24 * 60 * 60).isBefore(Instant.now())
+            SettingsCard {
+                Text(
+                    stringResource(R.string.backup_status),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    lastBackupAt?.let { backupAt ->
+                        stringResource(R.string.last_backup_time, reminderCheckTimeLabel(backupAt))
+                    } ?: stringResource(R.string.no_backup_created),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (backupIsStale) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+                if (backupIsStale) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        stringResource(R.string.backup_recommended),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SettingsActionCard(
@@ -324,6 +476,21 @@ fun SettingsScreen(
                         importLauncher.launch(arrayOf("application/json", "text/plain"))
                     },
                 )
+                if (recoverySnapshotAvailable) {
+                    SettingsActionCard(
+                        title = stringResource(R.string.restore_safety_snapshot),
+                        description = stringResource(R.string.restore_safety_snapshot_description),
+                        onClick = onPrepareRecoveryRestore,
+                    )
+                }
+                SettingsActionCard(
+                    title = stringResource(R.string.export_history_csv),
+                    description = stringResource(R.string.export_history_csv_description),
+                    iconRotation = -90f,
+                    onClick = {
+                        csvExportLauncher.launch("omnisim-renewals-${LocalDate.now()}.csv")
+                    },
+                )
             }
         }
 
@@ -331,20 +498,31 @@ fun SettingsScreen(
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SettingsActionCard(
+                    title = stringResource(R.string.legal_documents),
+                    description = stringResource(R.string.legal_documents_description),
+                    leadingIcon = Icons.Default.Lock,
+                    onClick = onOpenLegalDocuments,
+                )
+                SettingsActionCard(
                     title = stringResource(R.string.privacy_permissions),
                     description = stringResource(R.string.privacy_permissions_description),
                     leadingIcon = Icons.Default.Lock,
                     onClick = onOpenPrivacyPermissions,
                 )
-                SettingsActionCard(
-                    title = stringResource(R.string.usage_guide),
-                    description = stringResource(R.string.usage_guide_description),
-                    leadingIcon = Icons.Default.Info,
-                    onClick = onOpenUsageGuide,
-                )
             }
         }
+        }
 
+        if (section == SettingsSection.HelpAbout) {
+        item { SectionTitle(stringResource(R.string.settings_help_and_info)) }
+        item {
+            SettingsActionCard(
+                title = stringResource(R.string.usage_guide),
+                description = stringResource(R.string.usage_guide_description),
+                leadingIcon = Icons.Default.Info,
+                onClick = onOpenUsageGuide,
+            )
+        }
         item { SectionTitle(stringResource(R.string.settings_about)) }
         item {
             SettingsActionCard(
@@ -375,9 +553,10 @@ fun SettingsScreen(
                 )
             }
         }
+        }
     }
 
-    pendingRestore?.let { payload ->
+    if (section == SettingsSection.DataPrivacy) pendingRestore?.let { payload ->
         AlertDialog(
             onDismissRequest = onCancelRestore,
             title = {
@@ -414,303 +593,4 @@ fun SettingsScreen(
         )
     }
 
-}
-
-@Composable
-internal fun AppUpdateDialog(
-    state: AppUpdateUiState,
-    onRetry: () -> Unit,
-    onDownload: (String) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    when (state) {
-        AppUpdateUiState.Idle -> Unit
-        AppUpdateUiState.Checking -> AlertDialog(
-            onDismissRequest = onDismiss,
-            title = {
-                OmniDialogSystemBars()
-                Text(stringResource(R.string.checking_for_updates))
-            },
-            text = {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
-                    Text(stringResource(R.string.checking_for_updates_description))
-                }
-            },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            },
-        )
-        AppUpdateUiState.Failed -> AlertDialog(
-            onDismissRequest = onDismiss,
-            title = {
-                OmniDialogSystemBars()
-                Text(stringResource(R.string.update_check_failed))
-            },
-            text = { Text(stringResource(R.string.update_check_failed_description)) },
-            confirmButton = {
-                TextButton(onClick = onRetry) {
-                    Text(stringResource(R.string.action_retry))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            },
-        )
-        is AppUpdateUiState.UpToDate -> AlertDialog(
-            onDismissRequest = onDismiss,
-            title = {
-                OmniDialogSystemBars()
-                Text(stringResource(R.string.app_up_to_date))
-            },
-            text = {
-                Text(stringResource(R.string.app_up_to_date_description, state.latestVersion))
-            },
-            confirmButton = {
-                TextButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.action_ok))
-                }
-            },
-        )
-        is AppUpdateUiState.Available -> {
-            val release = state.release
-            AlertDialog(
-                onDismissRequest = onDismiss,
-                title = {
-                    OmniDialogSystemBars()
-                    Text(stringResource(R.string.update_available, release.version))
-                },
-                text = {
-                    Column(
-                        modifier = Modifier
-                            .heightIn(max = 420.dp)
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text(release.title, style = MaterialTheme.typography.titleSmall)
-                        Text(
-                            stringResource(
-                                R.string.current_and_latest_version,
-                                BuildConfig.VERSION_NAME,
-                                release.version,
-                            ),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        HorizontalDivider(Modifier.padding(vertical = 4.dp))
-                        Text(
-                            stringResource(R.string.whats_new),
-                            style = MaterialTheme.typography.titleSmall,
-                        )
-                        Text(release.notes ?: stringResource(R.string.no_release_notes))
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            onDownload(release.apkDownloadUrl)
-                            onDismiss()
-                        },
-                    ) {
-                        Text(stringResource(R.string.download_update))
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = onDismiss) {
-                        Text(stringResource(R.string.action_cancel))
-                    }
-                },
-            )
-        }
-    }
-}
-
-@Composable
-private fun SectionTitle(value: String) {
-    Column {
-        Spacer(Modifier.height(12.dp))
-        Text(
-            value,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
-        )
-    }
-}
-
-@Composable
-private fun SettingsActionCard(
-    title: String,
-    iconRotation: Float = 0f,
-    description: String? = null,
-    leadingIcon: ImageVector = Icons.AutoMirrored.Filled.ArrowForward,
-    onClick: () -> Unit,
-) {
-    Surface(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
-        shape = MaterialTheme.shapes.large,
-    ) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Surface(
-                modifier = Modifier.size(44.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                shape = CircleShape,
-            ) {
-                Icon(
-                    leadingIcon,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .padding(10.dp)
-                        .rotate(iconRotation),
-                )
-            }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                description?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            Icon(
-                Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                modifier = Modifier.size(20.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun ReminderSettingCard(
-    label: String,
-    checked: Boolean,
-    onToggle: () -> Unit,
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .toggleable(
-                value = checked,
-                role = Role.Checkbox,
-                onValueChange = { onToggle() },
-            ),
-        color = MaterialTheme.colorScheme.surface,
-        shape = MaterialTheme.shapes.large,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Checkbox(
-                checked = checked,
-                onCheckedChange = null,
-            )
-            Text(label, style = MaterialTheme.typography.bodyLarge)
-        }
-    }
-}
-
-@Composable
-private fun SettingsCard(
-    contentPadding: PaddingValues = PaddingValues(OmniCardPadding),
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        shape = MaterialTheme.shapes.large,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(
-            modifier = Modifier.padding(contentPadding),
-            content = content,
-        )
-    }
-}
-
-@Composable
-private fun SwitchSetting(
-    title: String,
-    description: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .toggleable(
-                value = checked,
-                role = Role.Switch,
-                onValueChange = onCheckedChange,
-            ),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(
-            Modifier
-                .weight(1f)
-                .padding(end = 16.dp),
-        ) {
-            Text(title, style = MaterialTheme.typography.titleSmall)
-            Spacer(Modifier.height(2.dp))
-            Text(
-                description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Switch(checked = checked, onCheckedChange = null)
-    }
-}
-
-@Composable
-private fun themeModeLabel(mode: ThemeMode): String = stringResource(
-    when (mode) {
-        ThemeMode.System -> R.string.theme_system
-        ThemeMode.Light -> R.string.theme_light
-        ThemeMode.Dark -> R.string.theme_dark
-    },
-)
-
-@Composable
-private fun appLanguageLabel(language: AppLanguage): String = stringResource(
-    when (language) {
-        AppLanguage.System -> R.string.language_system
-        AppLanguage.SimplifiedChinese -> R.string.language_simplified_chinese
-        AppLanguage.English -> R.string.language_english
-    },
-)
-
-@Composable
-private fun reminderLabel(offset: Int): String = when (offset) {
-    -1 -> stringResource(R.string.reminder_overdue)
-    0 -> stringResource(R.string.reminder_on_day)
-    1 -> stringResource(R.string.reminder_one_day_before)
-    else -> pluralStringResource(R.plurals.reminder_days_before, offset, offset)
 }

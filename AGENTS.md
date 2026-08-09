@@ -12,6 +12,10 @@ Treat this file as the local implementation contract for all work in this reposi
 - Work in verifiable increments and keep the project compilable.
 - Put business logic outside composables and cover critical logic with unit tests.
 - Do not leave fake data paths, placeholder core actions, or core-feature TODOs.
+- Keep every version-controlled Kotlin or Gradle Kotlin source file (`*.kt`, `*.kts`)
+  at or below 600 physical lines, including comments and blank lines. Generated and
+  build-output directories are excluded. Split files by responsibility instead of
+  suppressing or weakening the `checkCodeFileLength` verification task.
 
 ## Product identity and scope
 
@@ -66,7 +70,9 @@ Open -> see nearest renewal -> select SIM -> recharge externally
 ```
 
 Use exactly four bottom-navigation destinations: Home, SIMs, Usage, Settings. Renewal
-history belongs on the SIM detail screen. The top app bar may expose Add SIM.
+history belongs on the SIM detail screen. Usage is a first-class destination and
+must not be removed as unreachable or treated as dead code. The top app bar may
+expose Add SIM.
 
 ## Design contract
 
@@ -95,6 +101,17 @@ Show a clean vertical list with name, carrier/country where available, masked
 phone number, next date, days remaining, and textual status. Provide search over
 name, carrier, phone number, and country. Filters: Active, Due Soon, Overdue,
 Archived. Archived records do not appear in Home.
+
+### Usage
+
+Show local renewal-cost summaries for active SIMs without turning Home into an
+analytics dashboard. Present daily, 30-day, and 365-day estimates, per-currency
+breakdowns, data-coverage guidance, and links to complete missing price or cycle
+information. A combined total may use public European Central Bank reference
+rates in the user's default currency. Cache the most recent valid rates for
+offline fallback and clearly label loading, cached, partial, and unavailable
+states. Do not add telemetry, tracking, decorative charts, or remote SIM-data
+processing.
 
 ### Add/edit SIM
 
@@ -213,10 +230,13 @@ must leave existing data unchanged. Support future format migration via
 
 ## Privacy, permissions, and offline behavior
 
-Core behavior must work entirely offline. Internet is used only when the user
-explicitly opens a renewal website. Do not add `INTERNET` unless required for that
-external intent (normally it is not). Never upload SIM data, phone numbers, dates,
-or notes. Do not include analytics, crash reporting, advertising, or remote logging.
+Core SIM management, renewal history, reminders, and backup behavior must work
+entirely offline. Internet access is limited to fetching public European Central
+Bank reference rates, checking official GitHub releases, and user-initiated
+external renewal or update links. These requests must never include SIM data,
+phone numbers, prices, renewal dates, or notes. Keep recent valid exchange rates
+cached so Usage remains useful offline. Do not include analytics, crash reporting,
+advertising, telemetry, tracking, or remote logging.
 
 Keep permissions minimal. Notification permission is expected where Android
 requires it. Do not request contacts, SMS, phone, call logs, location, camera,
@@ -225,7 +245,7 @@ microphone, or broad storage access.
 ## Required implementation quality
 
 All core actions must use real persistent data and survive app/process restarts:
-add, edit, archive, restore, delete, renew, history, settings, notifications,
+add, edit, archive, restore, delete, renew, history, usage, settings, notifications,
 backup, and restore. Use Room `Flow`, off-main-thread file/database work, stable
 Compose list keys, and accessible labels. Optimize for a few to a few dozen records;
 do not introduce premature caching or abstraction.

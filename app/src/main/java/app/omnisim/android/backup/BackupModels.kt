@@ -4,9 +4,13 @@ import app.omnisim.android.data.local.entity.RenewalHistoryEntity
 import app.omnisim.android.data.local.entity.SimEntity
 import app.omnisim.android.data.preferences.AppSettings
 import app.omnisim.android.data.preferences.ThemeMode
+import app.omnisim.android.domain.util.isSupportedCurrencyCode
+import app.omnisim.android.domain.util.areReminderOffsetsValid
 import java.net.URI
 import java.time.Instant
 import java.time.LocalDate
+import java.util.Locale
+import java.util.UUID
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -38,6 +42,8 @@ data class BackupSim(
     val currency: String? = null,
     val renewalUrl: String? = null,
     val notes: String? = null,
+    val remindersEnabled: Boolean = true,
+    val reminderOffsets: Set<Int>? = null,
     val archived: Boolean,
     val createdAt: String,
     val updatedAt: String,
@@ -49,6 +55,8 @@ data class BackupRenewal(
     val simId: String,
     val renewalDate: String,
     val previousRenewalDate: String? = null,
+    val previousNextRenewalDate: String? = null,
+    val previousRenewalPrice: Double? = null,
     val nextRenewalDate: String? = null,
     val amount: Double? = null,
     val currency: String? = null,
@@ -75,7 +83,7 @@ data class BackupPayload(
 class BackupValidationException(message: String) : IllegalArgumentException(message)
 
 object BackupCodec {
-    const val CURRENT_VERSION = 2
+    const val CURRENT_VERSION = 3
 
     private val json = Json {
         prettyPrint = true
@@ -141,6 +149,8 @@ object BackupCodec {
         currency = currency,
         renewalUrl = renewalUrl,
         notes = notes,
+        remindersEnabled = remindersEnabled,
+        reminderOffsets = reminderOffsets,
         archived = archived,
         createdAt = createdAt.toString(),
         updatedAt = updatedAt.toString(),
@@ -150,6 +160,7 @@ object BackupCodec {
         if (id.isBlank() || name.isBlank() || carrier.isBlank()) {
             throw BackupValidationException("A SIM is missing a required field")
         }
+        validateUuid(id, "Invalid SIM identifier")
         if (simType !in setOf("eSIM", "Physical SIM")) {
             throw BackupValidationException("Invalid SIM type")
         }
@@ -168,6 +179,13 @@ object BackupCodec {
         if (!isSafeWebUrl(renewalUrl)) {
             throw BackupValidationException("Invalid renewal website")
         }
+        if (!areReminderOffsetsValid(reminderOffsets)) {
+            throw BackupValidationException("Invalid SIM reminder offsets")
+        }
+        val normalizedCurrency = currency?.trim()?.uppercase(Locale.ROOT)
+        if (normalizedCurrency != null && !isSupportedCurrencyCode(normalizedCurrency)) {
+            throw BackupValidationException("Invalid SIM currency")
+        }
         return try {
             SimEntity(
                 id = id,
@@ -183,9 +201,11 @@ object BackupCodec {
                 renewalCycleDays = renewalCycleDays,
                 renewalDayOfMonth = renewalDayOfMonth,
                 renewalPrice = renewalPrice,
-                currency = currency,
+                currency = normalizedCurrency,
                 renewalUrl = renewalUrl,
                 notes = notes,
+                remindersEnabled = remindersEnabled,
+                reminderOffsets = reminderOffsets,
                 archived = archived,
                 createdAt = Instant.parse(createdAt),
                 updatedAt = Instant.parse(updatedAt),
@@ -200,6 +220,8 @@ object BackupCodec {
         simId = simId,
         renewalDate = renewalDate.toString(),
         previousRenewalDate = previousRenewalDate?.toString(),
+        previousNextRenewalDate = previousNextRenewalDate?.toString(),
+        previousRenewalPrice = previousRenewalPrice,
         nextRenewalDate = nextRenewalDate?.toString(),
         amount = amount,
         currency = currency,
@@ -211,8 +233,19 @@ object BackupCodec {
         if (id.isBlank() || simId !in simIds) {
             throw BackupValidationException("Renewal history references a missing SIM")
         }
+        validateUuid(id, "Invalid renewal identifier")
         if (amount != null && (amount < 0 || !amount.isFinite())) {
             throw BackupValidationException("Invalid renewal amount")
+        }
+        if (
+            previousRenewalPrice != null &&
+            (previousRenewalPrice < 0 || !previousRenewalPrice.isFinite())
+        ) {
+            throw BackupValidationException("Invalid previous renewal price")
+        }
+        val normalizedCurrency = currency?.trim()?.uppercase(Locale.ROOT)
+        if (normalizedCurrency != null && !isSupportedCurrencyCode(normalizedCurrency)) {
+            throw BackupValidationException("Invalid renewal currency")
         }
         return try {
             RenewalHistoryEntity(
@@ -220,9 +253,11 @@ object BackupCodec {
                 simId = simId,
                 renewalDate = LocalDate.parse(renewalDate),
                 previousRenewalDate = previousRenewalDate?.let(LocalDate::parse),
+                previousNextRenewalDate = previousNextRenewalDate?.let(LocalDate::parse),
+                previousRenewalPrice = previousRenewalPrice,
                 nextRenewalDate = nextRenewalDate?.let(LocalDate::parse),
                 amount = amount,
-                currency = currency,
+                currency = normalizedCurrency,
                 notes = notes,
                 createdAt = Instant.parse(createdAt),
             )
@@ -241,7 +276,12 @@ object BackupCodec {
     )
 
     private fun BackupSettings.toSettings(): AppSettings {
-        if (warningPeriodDays < 0 || defaultCurrency.isBlank()) {
+        val normalizedCurrency = defaultCurrency.trim().uppercase(Locale.ROOT)
+        if (
+            warningPeriodDays !in 1..999 ||
+            !areReminderOffsetsValid(reminderOffsets) ||
+            !isSupportedCurrencyCode(normalizedCurrency)
+        ) {
             throw BackupValidationException("Invalid settings")
         }
         val mode = runCatching { ThemeMode.valueOf(themeMode) }.getOrElse {
@@ -253,8 +293,15 @@ object BackupCodec {
             warningPeriodDays = warningPeriodDays,
             maskPhoneNumbers = maskPhoneNumbers,
             reminderOffsets = reminderOffsets,
-            defaultCurrency = defaultCurrency.uppercase(),
+            defaultCurrency = normalizedCurrency,
         )
+    }
+
+    private fun validateUuid(value: String, message: String) {
+        val normalized = runCatching { UUID.fromString(value).toString() }.getOrNull()
+        if (normalized?.equals(value, ignoreCase = true) != true) {
+            throw BackupValidationException(message)
+        }
     }
 }
 

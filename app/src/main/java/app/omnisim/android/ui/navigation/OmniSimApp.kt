@@ -1,7 +1,10 @@
 package app.omnisim.android.ui.navigation
 
+import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings as AndroidSettings
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
@@ -63,7 +66,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
@@ -88,6 +90,7 @@ import androidx.navigation.compose.rememberNavController
 import app.omnisim.android.BuildConfig
 import app.omnisim.android.backup.isSafeWebUrl
 import app.omnisim.android.R
+import app.omnisim.android.data.preferences.CURRENT_LEGAL_CONSENT_VERSION
 import app.omnisim.android.data.update.isTrustedUpdateDownloadUrl
 import app.omnisim.android.ui.AppViewModel
 import app.omnisim.android.ui.components.OmniCircleIconButton
@@ -95,14 +98,18 @@ import app.omnisim.android.ui.components.OmniPageSurface
 import app.omnisim.android.ui.components.OmniPageTitleStyle
 import app.omnisim.android.ui.components.OmniSheetHeader
 import app.omnisim.android.ui.components.OmniDialogSystemBars
+import app.omnisim.android.ui.components.omniPrimaryPageBackground
 import app.omnisim.android.ui.editsim.AddEditSimScreen
 import app.omnisim.android.ui.home.HomeScreen
 import app.omnisim.android.ui.history.RenewalHistoryScreen
+import app.omnisim.android.ui.info.LegalConsentDialog
+import app.omnisim.android.ui.info.LegalDocumentsScreen
 import app.omnisim.android.ui.info.PrivacyPermissionsScreen
 import app.omnisim.android.ui.info.UsageGuideScreen
 import app.omnisim.android.ui.settings.AppLanguageController
 import app.omnisim.android.ui.settings.AppUpdateDialog
 import app.omnisim.android.ui.settings.SettingsScreen
+import app.omnisim.android.ui.settings.SettingsSection
 import app.omnisim.android.ui.simdetail.SimDetailScreen
 import app.omnisim.android.ui.sims.SimListScreen
 import app.omnisim.android.ui.splash.LAUNCH_REVEAL_DURATION_MILLIS
@@ -112,57 +119,6 @@ import app.omnisim.android.ui.theme.OmniSimTheme
 import app.omnisim.android.ui.theme.OmniScreenPadding
 import app.omnisim.android.ui.usage.UsageScreen
 import kotlinx.coroutines.delay
-
-private object Routes {
-    const val Home = "home"
-    const val Sims = "sims"
-    const val Usage = "usage"
-    const val Settings = "settings"
-    const val History = "history"
-    const val PrivacyPermissions = "settings/privacy-permissions"
-    const val UsageGuide = "settings/usage-guide"
-    const val Detail = "sim/{simId}"
-    const val Edit = "sim/{simId}/edit"
-
-    fun detail(id: String) = "sim/$id"
-    fun edit(id: String) = "sim/$id/edit"
-}
-
-private data class BottomDestination(
-    val route: String,
-    @param:StringRes val label: Int,
-    val icon: androidx.compose.ui.graphics.vector.ImageVector,
-)
-
-private val bottomDestinations = listOf(
-    BottomDestination(Routes.Home, R.string.nav_home, Icons.Outlined.Home),
-    BottomDestination(Routes.Sims, R.string.nav_sims, Icons.AutoMirrored.Outlined.List),
-    BottomDestination(Routes.Usage, R.string.nav_usage, usageIcon()),
-    BottomDestination(Routes.Settings, R.string.nav_settings, Icons.Outlined.Settings),
-)
-
-private fun usageIcon(): ImageVector =
-    ImageVector.Builder(
-        name = "Usage",
-        defaultWidth = 24.dp,
-        defaultHeight = 24.dp,
-        viewportWidth = 24f,
-        viewportHeight = 24f,
-    ).apply {
-        path(
-            fill = null,
-            stroke = SolidColor(Color.Black),
-            strokeLineWidth = 2.2f,
-            strokeLineCap = StrokeCap.Round,
-        ) {
-            moveTo(5f, 19f)
-            verticalLineTo(13f)
-            moveTo(12f, 19f)
-            verticalLineTo(5f)
-            moveTo(19f, 19f)
-            verticalLineTo(9f)
-        }
-    }.build()
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -198,7 +154,8 @@ fun OmniSimApp(
         }
     }
     val showLaunch = playLaunchAnimation && (!launchRevealFinished || state.isLoading)
-    val canCheckForUpdates = !state.isLoading && !showLaunch
+    val hasLegalConsent = state.legalConsentVersion >= CURRENT_LEGAL_CONSENT_VERSION
+    val canCheckForUpdates = !state.isLoading && !showLaunch && hasLegalConsent
 
     LaunchedEffect(canCheckForUpdates, viewModel) {
         if (canCheckForUpdates) {
@@ -211,8 +168,8 @@ fun OmniSimApp(
             snackbarHostState.showSnackbar(resources.getString(message.text))
         }
     }
-    LaunchedEffect(externalSimId) {
-        externalSimId?.let {
+    LaunchedEffect(externalSimId, hasLegalConsent) {
+        if (hasLegalConsent) externalSimId?.let {
             navController.navigate(Routes.detail(it)) { launchSingleTop = true }
             onExternalNavigationHandled()
         }
@@ -257,7 +214,7 @@ fun OmniSimApp(
                     left = padding.calculateLeftPadding(layoutDirection),
                     right = padding.calculateRightPadding(layoutDirection),
                 )
-                val primaryPageModifier = Modifier.statusBarsPadding()
+                val primaryPageModifier = Modifier
                 val secondaryPageModifier = Modifier
                     .statusBarsPadding()
                     .navigationBarsPadding()
@@ -270,13 +227,7 @@ fun OmniSimApp(
                     Box(
                         Modifier
                             .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    0f to MaterialTheme.colorScheme.primaryContainer,
-                                    0.62f to MaterialTheme.colorScheme.background,
-                                    1f to MaterialTheme.colorScheme.background,
-                                ),
-                            ),
+                            .omniPrimaryPageBackground(),
                     ) {
                         HomeScreen(
                             sims = state.sims,
@@ -287,6 +238,9 @@ fun OmniSimApp(
                             onRenew = { sim, actual, next, amount, notes ->
                                 viewModel.recordRenewal(sim.id, actual, next, amount, notes)
                             },
+                            onUpdateRenewal = viewModel::updateRenewal,
+                            onUndoRenewal = viewModel::undoRenewal,
+                            onReminderSettings = viewModel::setSimReminderSettings,
                             onOpenWebsite = { url -> if (isSafeWebUrl(url)) uriHandler.openUri(url) },
                             onEditSim = { navController.navigate(Routes.edit(it)) },
                             onArchive = viewModel::setArchived,
@@ -299,7 +253,7 @@ fun OmniSimApp(
                     OmniPageSurface(
                         title = stringResource(R.string.nav_sims),
                         modifier = primaryPageModifier,
-                        titleStyle = OmniPageTitleStyle.CompactLargeStart,
+                        titleStyle = OmniPageTitleStyle.Bubble,
                         action = {
                             OmniCircleIconButton(
                                 onClick = { showAddSim = true },
@@ -325,7 +279,7 @@ fun OmniSimApp(
                     OmniPageSurface(
                         title = stringResource(R.string.nav_usage),
                         modifier = primaryPageModifier,
-                        titleStyle = OmniPageTitleStyle.LargeStart,
+                        titleStyle = OmniPageTitleStyle.Bubble,
                     ) {
                         UsageScreen(
                             sims = state.sims,
@@ -357,11 +311,14 @@ fun OmniSimApp(
                     OmniPageSurface(
                         title = stringResource(R.string.nav_settings),
                         modifier = primaryPageModifier,
+                        titleStyle = OmniPageTitleStyle.Bubble,
                     ) {
                         SettingsScreen(
+                            section = SettingsSection.Overview,
                             settings = state.settings,
                             appLanguage = AppLanguageController.current(),
                             pendingRestore = state.pendingRestore,
+                            recoverySnapshotAvailable = state.recoverySnapshotAvailable,
                             onThemeMode = viewModel::setThemeMode,
                             onAppLanguage = AppLanguageController::set,
                             onDynamicColor = viewModel::setDynamicColor,
@@ -370,9 +327,19 @@ fun OmniSimApp(
                             onReminderOffsets = viewModel::setReminderOffsets,
                             onDefaultCurrency = viewModel::setDefaultCurrency,
                             onExport = viewModel::exportBackup,
+                            onExportHistoryCsv = viewModel::exportHistoryCsv,
                             onImport = viewModel::prepareRestore,
+                            onPrepareRecoveryRestore = viewModel::prepareRecoveryRestore,
                             onConfirmRestore = viewModel::confirmRestore,
                             onCancelRestore = viewModel::cancelRestore,
+                            onNotificationsEnabled = viewModel::checkRemindersNow,
+                            onSendTestNotification = viewModel::sendTestNotification,
+                            onOpenNotificationSettings = {
+                                openNotificationSettings(context)
+                            },
+                            onOpenLegalDocuments = {
+                                navController.navigate(Routes.LegalDocuments)
+                            },
                             onOpenPrivacyPermissions = {
                                 navController.navigate(Routes.PrivacyPermissions)
                             },
@@ -382,8 +349,81 @@ fun OmniSimApp(
                             onCheckForUpdates = {
                                 viewModel.checkForUpdates(BuildConfig.VERSION_NAME)
                             },
+                            onOpenSection = {
+                                navController.navigate(Routes.settingsCategory(it))
+                            },
                             bottomContentPadding = bottomNavigationContentPadding,
                         )
+                    }
+                }
+                composable(Routes.SettingsCategory) { entry ->
+                    val section = entry.arguments?.getString("category")
+                        ?.let { value -> SettingsSection.entries.firstOrNull { it.name == value } }
+                        ?: SettingsSection.Appearance
+                    val title = stringResource(
+                        when (section) {
+                            SettingsSection.Overview -> R.string.nav_settings
+                            SettingsSection.Appearance -> R.string.settings_appearance_and_language
+                            SettingsSection.Renewal -> R.string.settings_renewal_and_notifications
+                            SettingsSection.DataPrivacy -> R.string.settings_data_and_privacy
+                            SettingsSection.HelpAbout -> R.string.settings_help_about
+                        },
+                    )
+                    OmniPageSurface(
+                        title = title,
+                        modifier = secondaryPageModifier,
+                        navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
+                        onNavigate = { navController.popBackStack() },
+                    ) {
+                        SettingsScreen(
+                            section = section,
+                            settings = state.settings,
+                            appLanguage = AppLanguageController.current(),
+                            pendingRestore = state.pendingRestore,
+                            recoverySnapshotAvailable = state.recoverySnapshotAvailable,
+                            onThemeMode = viewModel::setThemeMode,
+                            onAppLanguage = AppLanguageController::set,
+                            onDynamicColor = viewModel::setDynamicColor,
+                            onWarningPeriod = viewModel::setWarningPeriod,
+                            onMaskPhoneNumbers = viewModel::setMaskPhoneNumbers,
+                            onReminderOffsets = viewModel::setReminderOffsets,
+                            onDefaultCurrency = viewModel::setDefaultCurrency,
+                            onExport = viewModel::exportBackup,
+                            onExportHistoryCsv = viewModel::exportHistoryCsv,
+                            onImport = viewModel::prepareRestore,
+                            onPrepareRecoveryRestore = viewModel::prepareRecoveryRestore,
+                            onConfirmRestore = viewModel::confirmRestore,
+                            onCancelRestore = viewModel::cancelRestore,
+                            onNotificationsEnabled = viewModel::checkRemindersNow,
+                            onSendTestNotification = viewModel::sendTestNotification,
+                            onOpenNotificationSettings = {
+                                openNotificationSettings(context)
+                            },
+                            onOpenLegalDocuments = {
+                                navController.navigate(Routes.LegalDocuments)
+                            },
+                            onOpenPrivacyPermissions = {
+                                navController.navigate(Routes.PrivacyPermissions)
+                            },
+                            onOpenUsageGuide = {
+                                navController.navigate(Routes.UsageGuide)
+                            },
+                            onCheckForUpdates = {
+                                viewModel.checkForUpdates(BuildConfig.VERSION_NAME)
+                            },
+                            onOpenSection = {},
+                            bottomContentPadding = 0.dp,
+                        )
+                    }
+                }
+                composable(Routes.LegalDocuments) {
+                    OmniPageSurface(
+                        title = stringResource(R.string.legal_documents),
+                        modifier = secondaryPageModifier,
+                        navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
+                        onNavigate = { navController.popBackStack() },
+                    ) {
+                        LegalDocumentsScreen()
                     }
                 }
                 composable(Routes.PrivacyPermissions) {
@@ -435,6 +475,11 @@ fun OmniSimApp(
                                 settings = state.settings,
                                 onRenew = { actual, next, amount, notes ->
                                     viewModel.recordRenewal(sim.id, actual, next, amount, notes)
+                                },
+                                onUpdateRenewal = viewModel::updateRenewal,
+                                onUndoRenewal = viewModel::undoRenewal,
+                                onReminderSettings = { enabled, offsets ->
+                                    viewModel.setSimReminderSettings(sim.id, enabled, offsets)
                                 },
                                 onOpenWebsite = { url -> if (isSafeWebUrl(url)) uriHandler.openUri(url) },
                                 onEdit = { navController.navigate(Routes.edit(sim.id)) },
@@ -530,7 +575,7 @@ fun OmniSimApp(
             }
         }
 
-        if (state.pendingRestore == null) {
+        if (hasLegalConsent && state.pendingRestore == null) {
             AppUpdateDialog(
                 state = appUpdateState,
                 onRetry = { viewModel.checkForUpdates(BuildConfig.VERSION_NAME) },
@@ -540,123 +585,11 @@ fun OmniSimApp(
                 onDismiss = viewModel::dismissUpdateDialog,
             )
         }
-    }
-}
-
-@Composable
-private fun FloatingBottomNavigation(
-    currentRoute: String,
-    onSelect: (BottomDestination) -> Unit,
-) {
-    val navigationHeight = 76.dp
-    val indicatorHeight = 64.dp
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(horizontal = OmniScreenPadding, vertical = 10.dp),
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.86f),
-            shape = CircleShape,
-            shadowElevation = 4.dp,
-            border = BorderStroke(
-                1.dp,
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
-            ),
-        ) {
-            BoxWithConstraints(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(navigationHeight),
-            ) {
-                val selectedIndex = bottomDestinations.indexOfFirst { it.route == currentRoute }
-                    .coerceAtLeast(0)
-                val itemWidth = maxWidth / bottomDestinations.size
-                val indicatorWidth = itemWidth - 8.dp
-                val indicatorOffset by animateDpAsState(
-                    targetValue = itemWidth * selectedIndex + (itemWidth - indicatorWidth) / 2,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioNoBouncy,
-                        stiffness = Spring.StiffnessMediumLow,
-                    ),
-                    label = "bottom-navigation-indicator",
-                )
-                Surface(
-                    modifier = Modifier
-                        .offset {
-                            IntOffset(
-                                x = indicatorOffset.roundToPx(),
-                                y = ((navigationHeight - indicatorHeight) / 2).roundToPx(),
-                            )
-                        }
-                        .width(indicatorWidth)
-                        .height(indicatorHeight),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.90f),
-                    shape = RoundedCornerShape(indicatorHeight / 2),
-                ) {}
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(navigationHeight),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    bottomDestinations.forEach { destination ->
-                        val selected = currentRoute == destination.route
-                        val label = stringResource(destination.label)
-                        val itemColor by animateColorAsState(
-                            targetValue = if (selected) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            label = "bottom-navigation-content",
-                        )
-                        val interactionSource = remember(destination.route) {
-                            MutableInteractionSource()
-                        }
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(navigationHeight)
-                                .selectable(
-                                    selected = selected,
-                                    interactionSource = interactionSource,
-                                    indication = null,
-                                    role = Role.Tab,
-                                    onClick = {
-                                        if (!selected) onSelect(destination)
-                                    },
-                                ),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center,
-                            ) {
-                                Box(
-                                    modifier = Modifier.size(36.dp),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Icon(
-                                        destination.icon,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(22.dp),
-                                        tint = itemColor,
-                                    )
-                                }
-                                Text(
-                                    label,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = itemColor,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+        if (!state.isLoading && !showLaunch && !hasLegalConsent) {
+            LegalConsentDialog(
+                onAgree = viewModel::acceptLegalConsent,
+                onDecline = { (context as? Activity)?.finishAndRemoveTask() },
+            )
         }
     }
 }
