@@ -20,7 +20,15 @@ class SimRepository(
 
     fun observeHistory(): Flow<List<RenewalHistoryEntity>> = dao.observeAllHistory()
 
-    suspend fun save(sim: SimEntity) = dao.upsertSim(sim)
+    suspend fun save(sim: SimEntity) {
+        database.withTransaction {
+            val previousRenewalDate = dao.getSim(sim.id)?.nextRenewalDate
+            dao.upsertSim(sim)
+            if (previousRenewalDate != null && previousRenewalDate != sim.nextRenewalDate) {
+                dao.deleteReminderStatesForSim(sim.id)
+            }
+        }
+    }
 
     suspend fun setArchived(id: String, archived: Boolean) {
         val existing = dao.getSim(id) ?: return
@@ -65,4 +73,3 @@ class SimRepository(
         }
     }
 }
-

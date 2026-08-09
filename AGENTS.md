@@ -65,7 +65,7 @@ Open -> see nearest renewal -> select SIM -> recharge externally
 -> save history -> reschedule reminders
 ```
 
-Use exactly three bottom-navigation destinations: Home, SIMs, Settings. Renewal
+Use exactly four bottom-navigation destinations: Home, SIMs, Usage, Settings. Renewal
 history belongs on the SIM detail screen. The top app bar may expose Add SIM.
 
 ## Design contract
@@ -101,8 +101,10 @@ Archived. Archived records do not appear in Home.
 Use a full-screen Compose form. Required: display name, carrier, next renewal
 date. Optional: phone, country, SIM type, plan, last renewal date, renewal cycle,
 amount, currency, renewal website, notes. SIM types are `eSIM` (default) and
-`Physical SIM`. Cycle presets are 30, 60, 90, 120, 180, 365 days, Custom, and no
-automatic cycle. Use native Material date pickers.
+`Physical SIM`. Cycle options are 30, 60, 90, 120, 180, 365 days, Custom,
+monthly on a fixed day from 1 through 31, and no automatic cycle. A monthly day
+that does not exist in a shorter month resolves to that month's final day. Use
+native Material date pickers.
 
 Validate required fields, positive cycles, non-negative prices, and HTTP(S) URLs.
 Do not over-validate international phone numbers. Store blank optional fields as
@@ -171,6 +173,7 @@ Centralize and test all date logic. Required utility behavior includes:
 ```kotlin
 daysUntilRenewal(today, renewalDate)
 calculateNextRenewalDate(actualRenewalDate, cycleDays)
+calculateNextMonthlyRenewalDate(actualRenewalDate, dayOfMonth)
 calculateRenewalStatus(today, renewalDate, warningPeriodDays, archived)
 ```
 
@@ -229,7 +232,7 @@ do not introduce premature caching or abstraction.
 
 Prioritize unit tests for:
 
-- 30/90/180/365-day renewal calculations
+- 30/90/180/365-day and fixed monthly-day renewal calculations
 - all derived statuses
 - reminder offset matching and deduplication
 - valid backup, invalid JSON, unsupported version, and missing required fields

@@ -43,6 +43,7 @@ import app.omnisim.android.ui.components.SimAvatar
 import app.omnisim.android.ui.components.StatusChip
 import app.omnisim.android.ui.components.daysRemainingLabel
 import app.omnisim.android.ui.components.displayDate
+import app.omnisim.android.ui.components.rememberCurrentDate
 import app.omnisim.android.ui.theme.OmniCardPadding
 import app.omnisim.android.ui.theme.OmniRowSpacing
 import app.omnisim.android.ui.theme.OmniScreenPadding
@@ -60,7 +61,7 @@ fun SimDetailScreen(
     onArchive: (Boolean) -> Unit,
     onDelete: () -> Unit,
 ) {
-    val today = LocalDate.now()
+    val today = rememberCurrentDate()
     val status = calculateRenewalStatus(
         today,
         sim.nextRenewalDate,
@@ -125,9 +126,18 @@ fun SimDetailScreen(
                     }
                     InfoRow(
                         stringResource(R.string.cycle),
-                        sim.renewalCycleDays?.let {
-                            pluralStringResource(R.plurals.cycle_every_days, it, it)
-                        } ?: stringResource(R.string.no_automatic_cycle),
+                        when {
+                            sim.renewalCycleDays != null -> pluralStringResource(
+                                R.plurals.cycle_every_days,
+                                sim.renewalCycleDays,
+                                sim.renewalCycleDays,
+                            )
+                            sim.renewalDayOfMonth != null -> stringResource(
+                                R.string.monthly_on_day,
+                                sim.renewalDayOfMonth,
+                            )
+                            else -> stringResource(R.string.no_automatic_cycle)
+                        },
                     )
                     sim.renewalPrice?.let {
                         InfoRow(

@@ -16,6 +16,15 @@ class UsageCostUtilsTest {
     }
 
     @Test
+    fun `monthly cost uses the average Gregorian month length`() {
+        assertEquals(
+            12.0 / (365.2425 / 12.0),
+            calculateDailyHoldingCost(12.0, null, 1)!!,
+            0.000_001,
+        )
+    }
+
+    @Test
     fun `missing or invalid values are excluded`() {
         assertNull(calculateDailyHoldingCost(null, 30))
         assertNull(calculateDailyHoldingCost(10.0, null))

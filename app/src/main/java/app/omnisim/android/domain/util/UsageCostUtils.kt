@@ -16,10 +16,16 @@ data class ConvertedCostTotal(
 fun calculateDailyHoldingCost(
     renewalPrice: Double?,
     renewalCycleDays: Int?,
+    renewalDayOfMonth: Int? = null,
 ): Double? {
     if (renewalPrice == null || !renewalPrice.isFinite() || renewalPrice < 0) return null
-    if (renewalCycleDays == null || renewalCycleDays <= 0) return null
-    return renewalPrice / renewalCycleDays
+    if (renewalCycleDays != null && renewalDayOfMonth != null) return null
+    val periodDays = when {
+        renewalCycleDays != null && renewalCycleDays > 0 -> renewalCycleDays.toDouble()
+        renewalDayOfMonth != null && renewalDayOfMonth in 1..31 -> 365.2425 / 12.0
+        else -> return null
+    }
+    return renewalPrice / periodDays
 }
 
 fun convertCurrencyAmount(

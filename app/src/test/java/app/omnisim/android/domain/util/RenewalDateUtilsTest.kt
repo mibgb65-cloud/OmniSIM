@@ -25,6 +25,41 @@ class RenewalDateUtilsTest {
     }
 
     @Test
+    fun `monthly renewal uses the next selected calendar day`() {
+        assertEquals(
+            LocalDate.of(2026, 9, 1),
+            calculateNextMonthlyRenewalDate(LocalDate.of(2026, 8, 1), 1),
+        )
+        assertEquals(
+            LocalDate.of(2026, 9, 1),
+            calculateNextMonthlyRenewalDate(LocalDate.of(2026, 8, 20), 1),
+        )
+        assertEquals(
+            LocalDate.of(2026, 8, 25),
+            calculateNextMonthlyRenewalDate(LocalDate.of(2026, 8, 20), 25),
+        )
+    }
+
+    @Test
+    fun `monthly renewal clamps to the last day of short months`() {
+        assertEquals(
+            LocalDate.of(2027, 2, 28),
+            calculateNextMonthlyRenewalDate(LocalDate.of(2027, 1, 31), 31),
+        )
+        assertEquals(
+            LocalDate.of(2028, 2, 29),
+            calculateNextMonthlyRenewalDate(LocalDate.of(2028, 1, 31), 31),
+        )
+    }
+
+    @Test
+    fun `monthly renewal day must be valid`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            calculateNextMonthlyRenewalDate(augustFirst, 32)
+        }
+    }
+
+    @Test
     fun `days until renewal preserves calendar dates`() {
         assertEquals(9L, daysUntilRenewal(augustFirst, LocalDate.of(2026, 8, 10)))
         assertEquals(-1L, daysUntilRenewal(augustFirst, LocalDate.of(2026, 7, 31)))
@@ -55,4 +90,3 @@ class RenewalDateUtilsTest {
         )
     }
 }
-

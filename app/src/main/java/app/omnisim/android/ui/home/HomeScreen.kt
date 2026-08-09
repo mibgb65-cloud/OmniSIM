@@ -66,13 +66,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -103,6 +107,7 @@ import app.omnisim.android.ui.components.StatusChip
 import app.omnisim.android.ui.components.daysRemainingLabel
 import app.omnisim.android.ui.components.displayDate
 import app.omnisim.android.ui.components.label
+import app.omnisim.android.ui.components.rememberCurrentDate
 import app.omnisim.android.ui.simdetail.SimDetailScreen
 import app.omnisim.android.ui.splash.rememberSystemAnimationsEnabled
 import java.time.LocalDate
@@ -122,7 +127,7 @@ fun HomeScreen(
     onDelete: (String) -> Unit,
     bottomContentPadding: Dp,
 ) {
-    val today = LocalDate.now()
+    val today = rememberCurrentDate()
     val statusBarPadding = WindowInsets.statusBars
         .asPaddingValues()
         .calculateTopPadding()
@@ -410,7 +415,12 @@ private fun HeroAction(
     ) {
         Surface(
             onClick = onClick,
-            modifier = Modifier.size(66.dp),
+            modifier = Modifier
+                .size(66.dp)
+                .semantics {
+                    contentDescription = label
+                    role = Role.Button
+                },
             color = MaterialTheme.colorScheme.secondaryContainer,
             contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
             shape = CircleShape,
@@ -426,6 +436,7 @@ private fun HeroAction(
             color = MaterialTheme.colorScheme.onPrimaryContainer,
             textAlign = TextAlign.Center,
             maxLines = 2,
+            modifier = Modifier.clearAndSetSemantics { },
         )
     }
 }
@@ -577,7 +588,8 @@ private fun SimPickerSheet(
     var detailSimId by rememberSaveable { mutableStateOf<String?>(null) }
     val detailSim = detailSimId?.let { id -> sims.find { it.id == id } }
     val animationsEnabled = rememberSystemAnimationsEnabled()
-    val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+    val windowSize = LocalWindowInfo.current.containerSize
+    val screenHeight = with(LocalDensity.current) { windowSize.height.toDp() }
     val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val collapsedHeight = minOf(
         screenHeight * 0.82f,
@@ -766,14 +778,26 @@ private fun SimPickerContent(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 StatusChip(status)
-                                sim.renewalCycleDays?.let { days ->
+                                val scheduleLabel = when {
+                                    sim.renewalCycleDays != null -> pluralStringResource(
+                                        R.plurals.cycle_days_option,
+                                        sim.renewalCycleDays,
+                                        sim.renewalCycleDays,
+                                    )
+                                    sim.renewalDayOfMonth != null -> stringResource(
+                                        R.string.monthly_on_day,
+                                        sim.renewalDayOfMonth,
+                                    )
+                                    else -> null
+                                }
+                                scheduleLabel?.let { label ->
                                     Surface(
                                         color = MaterialTheme.colorScheme.secondaryContainer,
                                         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                                         shape = CircleShape,
                                     ) {
                                         Text(
-                                            pluralStringResource(R.plurals.cycle_days_option, days, days),
+                                            label,
                                             style = MaterialTheme.typography.labelMedium,
                                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                                         )

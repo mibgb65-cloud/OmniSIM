@@ -38,12 +38,14 @@
     <string name="renewal_date">实际续费日期</string>
     <string name="next_renewal">下次续费日期</string>
     <string name="cycle_calculation_hint">根据 %1$d 天周期自动计算，点按日期可修改。</string>
+    <string name="monthly_calculation_hint">按每月 %1$d 日自动计算；当月没有该日期时使用月末最后一天。</string>
     <string name="amount">金额</string>
     <string name="notes_optional">备注（可选）</string>
     <string name="confirm_renewal">确认续费</string>
     <string name="error_non_negative_amount">请输入不小于 0 的金额</string>
     <string name="action_ok">确定</string>
     <string name="action_cancel">取消</string>
+    <string name="action_retry">重试</string>
 
     <string name="search_sims">搜索 SIM</string>
     <string name="filter_active">使用中</string>
@@ -83,6 +85,7 @@
     <string name="no_cost_data_description">为使用中的 SIM 填写续费金额和周期后，即可计算每天的保号成本。</string>
     <string name="cost_setup_title">完善保号成本</string>
     <string name="cost_setup_sim_hint">添加续费金额和周期</string>
+    <string name="cost_monthly_value">%1$s %2$s，每月 %3$d 日</string>
 
     <string name="sim_information">SIM 信息</string>
     <string name="sim_type">SIM 类型</string>
@@ -102,6 +105,9 @@
         <item quantity="other">每 %1$d 天</item>
     </plurals>
     <string name="no_automatic_cycle">不自动计算</string>
+    <string name="monthly_fixed_day">每月固定日期</string>
+    <string name="monthly_on_day">每月 %1$d 日</string>
+    <string name="monthly_day_of_month">每月日期（1–31）</string>
     <string name="price">续费金额</string>
     <string name="open_renewal_website">打开续费网站</string>
     <string name="action_edit">编辑</string>
@@ -159,7 +165,8 @@
     <string name="holding_cycle">保号周期</string>
     <string name="custom_holding_cycle_days">自定义保号周期（天）</string>
     <string name="next_holding_date">下次保号日期</string>
-    <string name="next_holding_date_hint">已根据激活日期和保号周期自动计算；如运营商规则特殊，可点按日期修改。</string>
+    <string name="next_holding_date_hint">已根据所选续费规则建议日期；如运营商规则特殊，可点按日期修改。</string>
+    <string name="next_holding_date_manual_hint">未选择自动周期，请手动设置下次续费日期。</string>
     <string name="holding_cost_optional">保号费用（可选）</string>
     <string name="per_sim_currency_hint">货币按这张 SIM 单独保存；设置中的默认货币仅用于新建时预填。</string>
     <string name="add_last_renewal_date">添加上次续费日期</string>
@@ -182,6 +189,8 @@
     <string name="error_carrier_required">请输入运营商</string>
     <string name="error_invalid_sim_type">请选择有效的 SIM 类型</string>
     <string name="error_positive_cycle">续费周期必须大于 0</string>
+    <string name="error_monthly_renewal_day">请输入 1 到 31 之间的日期</string>
+    <string name="error_single_renewal_schedule">固定天数与每月日期只能选择一种</string>
     <string name="error_non_negative_price">续费金额不能小于 0</string>
     <string name="error_valid_website">请输入有效的 http 或 https 网址</string>
     <string name="error_valid_custom_cycle">请输入有效的自定义周期</string>
@@ -228,6 +237,19 @@
     <string name="usage_guide">使用说明</string>
     <string name="usage_guide_description">了解 SIM、续费、提醒、成本和备份的主要操作。</string>
     <string name="settings_about">关于</string>
+    <string name="check_for_updates">检查更新</string>
+    <string name="check_for_updates_description">当前版本 %1$s · 检查最新正式版本。</string>
+    <string name="checking_for_updates">正在检查更新</string>
+    <string name="checking_for_updates_description">正在连接 OmniSIM 官方发布服务…</string>
+    <string name="update_check_failed">无法检查更新</string>
+    <string name="update_check_failed_description">请检查网络连接后重试，或稍后再试。</string>
+    <string name="app_up_to_date">已是最新版本</string>
+    <string name="app_up_to_date_description">OmniSIM %1$s 是当前最新正式版本。</string>
+    <string name="update_available">发现 OmniSIM %1$s</string>
+    <string name="current_and_latest_version">当前版本：%1$s · 最新版本：%2$s</string>
+    <string name="whats_new">更新内容</string>
+    <string name="no_release_notes">此版本没有提供更新说明。</string>
+    <string name="download_update">下载更新</string>
     <string name="open_source_license">本项目基于 MIT 许可证开源。</string>
     <string name="background_limitation">提醒时间为近似值，Android 及厂商的省电策略可能延迟后台任务。</string>
     <string name="privacy_local_first_title">本地优先设计</string>
@@ -240,9 +262,9 @@
     <string name="permission_status_not_required">无需授权</string>
     <string name="open_system_permissions">打开系统权限设置</string>
     <string name="privacy_network_title">网络访问</string>
-    <string name="privacy_network_body">网络仅用于下载欧洲中央银行公开的每日汇率文件。请求不包含 SIM 记录、手机号码、价格或日期；汇率服务仍可看到 IP 地址等标准网络信息。</string>
+    <string name="privacy_network_body">网络用于下载欧洲中央银行公开的每日汇率文件，并在每次冷启动或手动检查时从 GitHub 获取 OmniSIM 最新正式版本。这些请求不包含 SIM 记录、手机号码、价格或日期；相关服务仍可看到 IP 地址等标准网络信息。</string>
     <string name="privacy_files_title">备份、恢复与外部网站</string>
-    <string name="privacy_files_body">备份和恢复使用 Android 文件选择器，OmniSIM 只能访问你主动选择的文件，也不会申请广泛存储权限。导出的备份包含 SIM 数据，请妥善保管。续费链接会交给浏览器打开，OmniSIM 不会把已存储的 SIM 数据附加到网址中。</string>
+    <string name="privacy_files_body">备份和恢复使用 Android 文件选择器，OmniSIM 只能访问你主动选择的文件，也不会申请广泛存储权限。导出的备份包含 SIM 数据，请妥善保管。续费链接和更新下载会交给浏览器打开，OmniSIM 不会把已存储的 SIM 数据附加到网址中。</string>
     <string name="privacy_unused_permissions_title">OmniSIM 不使用的权限</string>
     <string name="privacy_unused_permissions_body">OmniSIM 不会申请通讯录、短信、电话、通话记录、位置、相机、麦克风或广泛存储权限。</string>
     <string name="privacy_deletion_title">删除数据</string>

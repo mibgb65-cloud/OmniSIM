@@ -33,6 +33,7 @@ data class BackupSim(
     val lastRenewalDate: String? = null,
     val nextRenewalDate: String,
     val renewalCycleDays: Int? = null,
+    val renewalDayOfMonth: Int? = null,
     val renewalPrice: Double? = null,
     val currency: String? = null,
     val renewalUrl: String? = null,
@@ -74,7 +75,7 @@ data class BackupPayload(
 class BackupValidationException(message: String) : IllegalArgumentException(message)
 
 object BackupCodec {
-    const val CURRENT_VERSION = 1
+    const val CURRENT_VERSION = 2
 
     private val json = Json {
         prettyPrint = true
@@ -105,7 +106,7 @@ object BackupCodec {
         } catch (exception: IllegalArgumentException) {
             throw BackupValidationException("Backup contains invalid values")
         }
-        if (document.backupVersion != CURRENT_VERSION) {
+        if (document.backupVersion !in 1..CURRENT_VERSION) {
             throw BackupValidationException("Unsupported backup version: ${document.backupVersion}")
         }
         runCatching { Instant.parse(document.exportedAt) }
@@ -135,6 +136,7 @@ object BackupCodec {
         lastRenewalDate = lastRenewalDate?.toString(),
         nextRenewalDate = nextRenewalDate.toString(),
         renewalCycleDays = renewalCycleDays,
+        renewalDayOfMonth = renewalDayOfMonth,
         renewalPrice = renewalPrice,
         currency = currency,
         renewalUrl = renewalUrl,
@@ -153,6 +155,12 @@ object BackupCodec {
         }
         if (renewalCycleDays != null && renewalCycleDays <= 0) {
             throw BackupValidationException("Invalid renewal cycle")
+        }
+        if (renewalDayOfMonth != null && renewalDayOfMonth !in 1..31) {
+            throw BackupValidationException("Invalid monthly renewal day")
+        }
+        if (renewalCycleDays != null && renewalDayOfMonth != null) {
+            throw BackupValidationException("A SIM has conflicting renewal schedules")
         }
         if (renewalPrice != null && (renewalPrice < 0 || !renewalPrice.isFinite())) {
             throw BackupValidationException("Invalid renewal price")
@@ -173,6 +181,7 @@ object BackupCodec {
                 lastRenewalDate = lastRenewalDate?.let(LocalDate::parse),
                 nextRenewalDate = LocalDate.parse(nextRenewalDate),
                 renewalCycleDays = renewalCycleDays,
+                renewalDayOfMonth = renewalDayOfMonth,
                 renewalPrice = renewalPrice,
                 currency = currency,
                 renewalUrl = renewalUrl,

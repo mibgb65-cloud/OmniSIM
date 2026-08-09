@@ -33,9 +33,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsTopHeight
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.selection.selectable
@@ -86,8 +85,10 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import app.omnisim.android.BuildConfig
 import app.omnisim.android.backup.isSafeWebUrl
 import app.omnisim.android.R
+import app.omnisim.android.data.update.isTrustedUpdateDownloadUrl
 import app.omnisim.android.ui.AppViewModel
 import app.omnisim.android.ui.components.OmniCircleIconButton
 import app.omnisim.android.ui.components.OmniPageSurface
@@ -100,6 +101,7 @@ import app.omnisim.android.ui.history.RenewalHistoryScreen
 import app.omnisim.android.ui.info.PrivacyPermissionsScreen
 import app.omnisim.android.ui.info.UsageGuideScreen
 import app.omnisim.android.ui.settings.AppLanguageController
+import app.omnisim.android.ui.settings.AppUpdateDialog
 import app.omnisim.android.ui.settings.SettingsScreen
 import app.omnisim.android.ui.simdetail.SimDetailScreen
 import app.omnisim.android.ui.sims.SimListScreen
@@ -172,6 +174,7 @@ fun OmniSimApp(
     launchAnimationStarted: Boolean,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val appUpdateState by viewModel.appUpdateState.collectAsStateWithLifecycle()
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val route = backStackEntry?.destination?.route ?: Routes.Home
@@ -195,6 +198,13 @@ fun OmniSimApp(
         }
     }
     val showLaunch = playLaunchAnimation && (!launchRevealFinished || state.isLoading)
+    val canCheckForUpdates = !state.isLoading && !showLaunch
+
+    LaunchedEffect(canCheckForUpdates, viewModel) {
+        if (canCheckForUpdates) {
+            viewModel.checkForUpdatesOnLaunch(BuildConfig.VERSION_NAME)
+        }
+    }
 
     LaunchedEffect(viewModel, resources) {
         viewModel.messages.collect { message ->
@@ -211,19 +221,10 @@ fun OmniSimApp(
     OmniSimTheme(state.settings) {
         val bottomNavigationContentPadding =
             96.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-        val rootBackground = if (route == Routes.Home) {
-            Brush.verticalGradient(
-                0f to MaterialTheme.colorScheme.primaryContainer,
-                0.62f to MaterialTheme.colorScheme.background,
-                1f to MaterialTheme.colorScheme.background,
-            )
-        } else {
-            SolidColor(MaterialTheme.colorScheme.background)
-        }
         Box(
             Modifier
                 .fillMaxSize()
-                .background(rootBackground),
+                .background(MaterialTheme.colorScheme.background),
         ) {
             Scaffold(
                 bottomBar = {
@@ -252,40 +253,52 @@ fun OmniSimApp(
                 containerColor = Color.Transparent,
             ) { padding ->
                 val layoutDirection = LocalLayoutDirection.current
-                val navHostModifier = if (isPrimary) {
-                    Modifier.absolutePadding(
-                        left = padding.calculateLeftPadding(layoutDirection),
-                        top = if (route == Routes.Home) 0.dp else padding.calculateTopPadding(),
-                        right = padding.calculateRightPadding(layoutDirection),
-                    )
-                } else {
-                    Modifier.padding(padding)
-                }
+                val navHostModifier = Modifier.absolutePadding(
+                    left = padding.calculateLeftPadding(layoutDirection),
+                    right = padding.calculateRightPadding(layoutDirection),
+                )
+                val primaryPageModifier = Modifier.statusBarsPadding()
+                val secondaryPageModifier = Modifier
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
                 NavHost(
                     navController = navController,
                     startDestination = Routes.Home,
                     modifier = navHostModifier,
                 ) {
                 composable(Routes.Home) {
-                    HomeScreen(
-                        sims = state.sims,
-                        history = state.history,
-                        settings = state.settings,
-                        onAdd = { showAddSim = true },
-                        onOpenSim = { navController.navigate(Routes.detail(it)) },
-                        onRenew = { sim, actual, next, amount, notes ->
-                            viewModel.recordRenewal(sim.id, actual, next, amount, notes)
-                        },
-                        onOpenWebsite = { url -> if (isSafeWebUrl(url)) uriHandler.openUri(url) },
-                        onEditSim = { navController.navigate(Routes.edit(it)) },
-                        onArchive = viewModel::setArchived,
-                        onDelete = viewModel::delete,
-                        bottomContentPadding = bottomNavigationContentPadding,
-                    )
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    0f to MaterialTheme.colorScheme.primaryContainer,
+                                    0.62f to MaterialTheme.colorScheme.background,
+                                    1f to MaterialTheme.colorScheme.background,
+                                ),
+                            ),
+                    ) {
+                        HomeScreen(
+                            sims = state.sims,
+                            history = state.history,
+                            settings = state.settings,
+                            onAdd = { showAddSim = true },
+                            onOpenSim = { navController.navigate(Routes.detail(it)) },
+                            onRenew = { sim, actual, next, amount, notes ->
+                                viewModel.recordRenewal(sim.id, actual, next, amount, notes)
+                            },
+                            onOpenWebsite = { url -> if (isSafeWebUrl(url)) uriHandler.openUri(url) },
+                            onEditSim = { navController.navigate(Routes.edit(it)) },
+                            onArchive = viewModel::setArchived,
+                            onDelete = viewModel::delete,
+                            bottomContentPadding = bottomNavigationContentPadding,
+                        )
+                    }
                 }
                 composable(Routes.Sims) {
                     OmniPageSurface(
                         title = stringResource(R.string.nav_sims),
+                        modifier = primaryPageModifier,
                         titleStyle = OmniPageTitleStyle.CompactLargeStart,
                         action = {
                             OmniCircleIconButton(
@@ -311,6 +324,7 @@ fun OmniSimApp(
                 composable(Routes.Usage) {
                     OmniPageSurface(
                         title = stringResource(R.string.nav_usage),
+                        modifier = primaryPageModifier,
                         titleStyle = OmniPageTitleStyle.LargeStart,
                     ) {
                         UsageScreen(
@@ -328,6 +342,7 @@ fun OmniSimApp(
                 composable(Routes.History) {
                     OmniPageSurface(
                         title = stringResource(R.string.all_renewal_history),
+                        modifier = secondaryPageModifier,
                         navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
                         onNavigate = { navController.popBackStack() },
                     ) {
@@ -339,7 +354,10 @@ fun OmniSimApp(
                     }
                 }
                 composable(Routes.Settings) {
-                    OmniPageSurface(title = stringResource(R.string.nav_settings)) {
+                    OmniPageSurface(
+                        title = stringResource(R.string.nav_settings),
+                        modifier = primaryPageModifier,
+                    ) {
                         SettingsScreen(
                             settings = state.settings,
                             appLanguage = AppLanguageController.current(),
@@ -361,6 +379,9 @@ fun OmniSimApp(
                             onOpenUsageGuide = {
                                 navController.navigate(Routes.UsageGuide)
                             },
+                            onCheckForUpdates = {
+                                viewModel.checkForUpdates(BuildConfig.VERSION_NAME)
+                            },
                             bottomContentPadding = bottomNavigationContentPadding,
                         )
                     }
@@ -368,6 +389,7 @@ fun OmniSimApp(
                 composable(Routes.PrivacyPermissions) {
                     OmniPageSurface(
                         title = stringResource(R.string.privacy_permissions),
+                        modifier = secondaryPageModifier,
                         navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
                         onNavigate = { navController.popBackStack() },
                     ) {
@@ -385,6 +407,7 @@ fun OmniSimApp(
                 composable(Routes.UsageGuide) {
                     OmniPageSurface(
                         title = stringResource(R.string.usage_guide),
+                        modifier = secondaryPageModifier,
                         navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
                         onNavigate = { navController.popBackStack() },
                     ) {
@@ -396,6 +419,7 @@ fun OmniSimApp(
                     val sim = state.sims.find { it.id == id }
                     OmniPageSurface(
                         title = stringResource(R.string.title_sim_details),
+                        modifier = secondaryPageModifier,
                         navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
                         onNavigate = { navController.popBackStack() },
                     ) {
@@ -431,6 +455,7 @@ fun OmniSimApp(
                     val sim = state.sims.find { it.id == id }
                     OmniPageSurface(
                         title = stringResource(R.string.title_edit_sim),
+                        modifier = secondaryPageModifier,
                         navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
                         onNavigate = { navController.popBackStack() },
                     ) {
@@ -484,22 +509,6 @@ fun OmniSimApp(
                 }
             }
 
-            if (!showAddSim) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .fillMaxWidth()
-                        .windowInsetsTopHeight(WindowInsets.statusBars)
-                        .background(
-                            if (route == Routes.Home) {
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
-                            } else {
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.82f)
-                            },
-                        ),
-                )
-            }
-
             AnimatedVisibility(
                 visible = showLaunch,
                 modifier = Modifier.fillMaxSize(),
@@ -519,6 +528,17 @@ fun OmniSimApp(
                     modifier = Modifier.fillMaxSize(),
                 )
             }
+        }
+
+        if (state.pendingRestore == null) {
+            AppUpdateDialog(
+                state = appUpdateState,
+                onRetry = { viewModel.checkForUpdates(BuildConfig.VERSION_NAME) },
+                onDownload = { url ->
+                    if (isTrustedUpdateDownloadUrl(url)) uriHandler.openUri(url)
+                },
+                onDismiss = viewModel::dismissUpdateDialog,
+            )
         }
     }
 }

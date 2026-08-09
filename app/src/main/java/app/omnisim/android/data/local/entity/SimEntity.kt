@@ -22,6 +22,7 @@ data class SimEntity(
     val lastRenewalDate: LocalDate? = null,
     val nextRenewalDate: LocalDate,
     val renewalCycleDays: Int? = null,
+    val renewalDayOfMonth: Int? = null,
     val renewalPrice: Double? = null,
     val currency: String? = null,
     val renewalUrl: String? = null,
@@ -30,4 +31,3 @@ data class SimEntity(
     val createdAt: Instant,
     val updatedAt: Instant,
 )
-

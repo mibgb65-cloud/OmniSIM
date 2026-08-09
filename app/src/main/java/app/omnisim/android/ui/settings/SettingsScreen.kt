@@ -6,18 +6,23 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Info
@@ -25,6 +30,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -47,6 +53,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -59,6 +66,7 @@ import app.omnisim.android.data.preferences.ThemeMode
 import app.omnisim.android.ui.components.OmniDialogSystemBars
 import app.omnisim.android.ui.components.CurrencyPickerField
 import app.omnisim.android.ui.components.omniTextFieldColors
+import app.omnisim.android.ui.AppUpdateUiState
 import app.omnisim.android.ui.theme.OmniCardPadding
 import app.omnisim.android.ui.theme.OmniScreenPadding
 import app.omnisim.android.ui.theme.OmniSectionSpacing
@@ -85,6 +93,7 @@ fun SettingsScreen(
     onCancelRestore: () -> Unit,
     onOpenPrivacyPermissions: () -> Unit,
     onOpenUsageGuide: () -> Unit,
+    onCheckForUpdates: () -> Unit,
     bottomContentPadding: Dp,
 ) {
     val context = LocalContext.current
@@ -119,7 +128,10 @@ fun SettingsScreen(
         item { SectionTitle(stringResource(R.string.settings_appearance)) }
         item {
             SettingsCard {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     ThemeMode.entries.forEach { mode ->
                         FilterChip(
                             selected = settings.themeMode == mode,
@@ -148,7 +160,10 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.titleSmall,
                 )
                 Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     AppLanguage.entries.forEach { language ->
                         FilterChip(
                             selected = appLanguage == language,
@@ -175,7 +190,10 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.titleSmall,
                 )
                 Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
                     warningPeriods.forEach { days ->
                         FilterChip(
                             selected = settings.warningPeriodDays == days,
@@ -329,6 +347,17 @@ fun SettingsScreen(
 
         item { SectionTitle(stringResource(R.string.settings_about)) }
         item {
+            SettingsActionCard(
+                title = stringResource(R.string.check_for_updates),
+                description = stringResource(
+                    R.string.check_for_updates_description,
+                    BuildConfig.VERSION_NAME,
+                ),
+                leadingIcon = Icons.Default.Info,
+                onClick = onCheckForUpdates,
+            )
+        }
+        item {
             SettingsCard {
                 Text("OmniSIM ${BuildConfig.VERSION_NAME}", fontWeight = FontWeight.SemiBold)
                 Text(
@@ -383,6 +412,124 @@ fun SettingsScreen(
                 }
             },
         )
+    }
+
+}
+
+@Composable
+internal fun AppUpdateDialog(
+    state: AppUpdateUiState,
+    onRetry: () -> Unit,
+    onDownload: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    when (state) {
+        AppUpdateUiState.Idle -> Unit
+        AppUpdateUiState.Checking -> AlertDialog(
+            onDismissRequest = onDismiss,
+            title = {
+                OmniDialogSystemBars()
+                Text(stringResource(R.string.checking_for_updates))
+            },
+            text = {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                    Text(stringResource(R.string.checking_for_updates_description))
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+        AppUpdateUiState.Failed -> AlertDialog(
+            onDismissRequest = onDismiss,
+            title = {
+                OmniDialogSystemBars()
+                Text(stringResource(R.string.update_check_failed))
+            },
+            text = { Text(stringResource(R.string.update_check_failed_description)) },
+            confirmButton = {
+                TextButton(onClick = onRetry) {
+                    Text(stringResource(R.string.action_retry))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+        is AppUpdateUiState.UpToDate -> AlertDialog(
+            onDismissRequest = onDismiss,
+            title = {
+                OmniDialogSystemBars()
+                Text(stringResource(R.string.app_up_to_date))
+            },
+            text = {
+                Text(stringResource(R.string.app_up_to_date_description, state.latestVersion))
+            },
+            confirmButton = {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.action_ok))
+                }
+            },
+        )
+        is AppUpdateUiState.Available -> {
+            val release = state.release
+            AlertDialog(
+                onDismissRequest = onDismiss,
+                title = {
+                    OmniDialogSystemBars()
+                    Text(stringResource(R.string.update_available, release.version))
+                },
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .heightIn(max = 420.dp)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(release.title, style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            stringResource(
+                                R.string.current_and_latest_version,
+                                BuildConfig.VERSION_NAME,
+                                release.version,
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                        Text(
+                            stringResource(R.string.whats_new),
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        Text(release.notes ?: stringResource(R.string.no_release_notes))
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            onDownload(release.apkDownloadUrl)
+                            onDismiss()
+                        },
+                    ) {
+                        Text(stringResource(R.string.download_update))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = onDismiss) {
+                        Text(stringResource(R.string.action_cancel))
+                    }
+                },
+            )
+        }
     }
 }
 
@@ -467,8 +614,13 @@ private fun ReminderSettingCard(
     onToggle: () -> Unit,
 ) {
     Surface(
-        onClick = onToggle,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(
+                value = checked,
+                role = Role.Checkbox,
+                onValueChange = { onToggle() },
+            ),
         color = MaterialTheme.colorScheme.surface,
         shape = MaterialTheme.shapes.large,
     ) {
@@ -478,7 +630,7 @@ private fun ReminderSettingCard(
         ) {
             Checkbox(
                 checked = checked,
-                onCheckedChange = { onToggle() },
+                onCheckedChange = null,
             )
             Text(label, style = MaterialTheme.typography.bodyLarge)
         }
@@ -510,7 +662,13 @@ private fun SwitchSetting(
     onCheckedChange: (Boolean) -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(
+                value = checked,
+                role = Role.Switch,
+                onValueChange = onCheckedChange,
+            ),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -527,7 +685,7 @@ private fun SwitchSetting(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 

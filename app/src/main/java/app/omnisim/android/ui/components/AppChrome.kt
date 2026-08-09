@@ -227,6 +227,7 @@ fun OmniSectionHeader(
         text = text,
         style = MaterialTheme.typography.headlineSmall,
         fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onBackground,
         modifier = modifier,
     )
 }

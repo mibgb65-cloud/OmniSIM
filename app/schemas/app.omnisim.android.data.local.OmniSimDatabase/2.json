@@ -1,0 +1,305 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 2,
+    "identityHash": "0f8c685bdffc33bad48ce0da525527d6",
+    "entities": [
+      {
+        "tableName": "sims",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `carrier` TEXT NOT NULL, `countryCode` TEXT, `countryName` TEXT, `phoneNumber` TEXT, `simType` TEXT NOT NULL, `planName` TEXT, `lastRenewalDate` TEXT, `nextRenewalDate` TEXT NOT NULL, `renewalCycleDays` INTEGER, `renewalDayOfMonth` INTEGER, `renewalPrice` REAL, `currency` TEXT, `renewalUrl` TEXT, `notes` TEXT, `archived` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "carrier",
+            "columnName": "carrier",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "countryCode",
+            "columnName": "countryCode",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "countryName",
+            "columnName": "countryName",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "phoneNumber",
+            "columnName": "phoneNumber",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "simType",
+            "columnName": "simType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "planName",
+            "columnName": "planName",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lastRenewalDate",
+            "columnName": "lastRenewalDate",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "nextRenewalDate",
+            "columnName": "nextRenewalDate",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "renewalCycleDays",
+            "columnName": "renewalCycleDays",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "renewalDayOfMonth",
+            "columnName": "renewalDayOfMonth",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "renewalPrice",
+            "columnName": "renewalPrice",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "currency",
+            "columnName": "currency",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "renewalUrl",
+            "columnName": "renewalUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "notes",
+            "columnName": "notes",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "archived",
+            "columnName": "archived",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_sims_nextRenewalDate",
+            "unique": false,
+            "columnNames": [
+              "nextRenewalDate"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_sims_nextRenewalDate` ON `${TABLE_NAME}` (`nextRenewalDate`)"
+          },
+          {
+            "name": "index_sims_archived",
+            "unique": false,
+            "columnNames": [
+              "archived"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_sims_archived` ON `${TABLE_NAME}` (`archived`)"
+          }
+        ]
+      },
+      {
+        "tableName": "renewal_history",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `simId` TEXT NOT NULL, `renewalDate` TEXT NOT NULL, `previousRenewalDate` TEXT, `nextRenewalDate` TEXT, `amount` REAL, `currency` TEXT, `notes` TEXT, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`simId`) REFERENCES `sims`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "simId",
+            "columnName": "simId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "renewalDate",
+            "columnName": "renewalDate",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "previousRenewalDate",
+            "columnName": "previousRenewalDate",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "nextRenewalDate",
+            "columnName": "nextRenewalDate",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "amount",
+            "columnName": "amount",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "currency",
+            "columnName": "currency",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "notes",
+            "columnName": "notes",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_renewal_history_simId",
+            "unique": false,
+            "columnNames": [
+              "simId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_renewal_history_simId` ON `${TABLE_NAME}` (`simId`)"
+          },
+          {
+            "name": "index_renewal_history_simId_renewalDate",
+            "unique": false,
+            "columnNames": [
+              "simId",
+              "renewalDate"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_renewal_history_simId_renewalDate` ON `${TABLE_NAME}` (`simId`, `renewalDate`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "sims",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "simId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "reminder_state",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`simId` TEXT NOT NULL, `renewalDate` TEXT NOT NULL, `reminderOffset` INTEGER NOT NULL, `sentAt` INTEGER NOT NULL, PRIMARY KEY(`simId`, `renewalDate`, `reminderOffset`), FOREIGN KEY(`simId`) REFERENCES `sims`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "simId",
+            "columnName": "simId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "renewalDate",
+            "columnName": "renewalDate",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reminderOffset",
+            "columnName": "reminderOffset",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sentAt",
+            "columnName": "sentAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "simId",
+            "renewalDate",
+            "reminderOffset"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_reminder_state_simId",
+            "unique": false,
+            "columnNames": [
+              "simId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_reminder_state_simId` ON `${TABLE_NAME}` (`simId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "sims",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "simId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '0f8c685bdffc33bad48ce0da525527d6')"
+    ]
+  }
+}

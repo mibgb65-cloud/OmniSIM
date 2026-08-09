@@ -10,7 +10,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.viewmodel.compose.viewModel
-import app.omnisim.android.display.HighRefreshRateController
 import app.omnisim.android.ui.AppViewModel
 import app.omnisim.android.ui.AppViewModelFactory
 import app.omnisim.android.ui.navigation.OmniSimApp
@@ -45,11 +44,6 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         requestedSimId = intent.getStringExtra(EXTRA_SIM_ID)
-    }
-
-    override fun onResume() {
-        super.onResume()
-        HighRefreshRateController.request(this)
     }
 
     companion object {

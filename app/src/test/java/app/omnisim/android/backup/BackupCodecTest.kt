@@ -64,9 +64,39 @@ class BackupCodecTest {
     @Test
     fun `unsupported backup version is rejected`() {
         val encoded = BackupCodec.encode(listOf(sim), emptyList(), AppSettings())
-            .replace("\"backupVersion\": 1", "\"backupVersion\": 99")
+            .replace("\"backupVersion\": 2", "\"backupVersion\": 99")
         assertThrows(BackupValidationException::class.java) {
             BackupCodec.decode(encoded)
+        }
+    }
+
+    @Test
+    fun `version one backup remains supported`() {
+        val encoded = BackupCodec.encode(listOf(sim), emptyList(), AppSettings())
+            .replace("\"backupVersion\": 2", "\"backupVersion\": 1")
+            .replace("        \"renewalDayOfMonth\": null,\n", "")
+
+        assertEquals(sim, BackupCodec.decode(encoded).sims.single())
+    }
+
+    @Test
+    fun `monthly renewal schedule round trips`() {
+        val monthly = sim.copy(renewalCycleDays = null, renewalDayOfMonth = 1)
+        val decoded = BackupCodec.decode(
+            BackupCodec.encode(listOf(monthly), emptyList(), AppSettings()),
+        )
+
+        assertEquals(monthly, decoded.sims.single())
+    }
+
+    @Test
+    fun `conflicting renewal schedules are rejected`() {
+        val conflicting = sim.copy(renewalCycleDays = 30, renewalDayOfMonth = 1)
+
+        assertThrows(BackupValidationException::class.java) {
+            BackupCodec.decode(
+                BackupCodec.encode(listOf(conflicting), emptyList(), AppSettings()),
+            )
         }
     }
 
@@ -101,4 +131,3 @@ class BackupCodecTest {
         }
     }
 }
-

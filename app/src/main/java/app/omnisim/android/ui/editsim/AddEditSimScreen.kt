@@ -47,6 +47,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -70,11 +71,13 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
 import app.omnisim.android.R
 import app.omnisim.android.backup.isSafeWebUrl
 import app.omnisim.android.data.local.entity.SimEntity
 import app.omnisim.android.domain.util.callingCodeCountries
 import app.omnisim.android.domain.util.calculateNextRenewalDate
+import app.omnisim.android.domain.util.calculateScheduledNextRenewalDate
 import app.omnisim.android.domain.util.formatInternationalPhoneNumber
 import app.omnisim.android.domain.util.isSupportedCurrencyCode
 import app.omnisim.android.domain.util.splitInternationalPhoneNumber
@@ -85,6 +88,7 @@ import app.omnisim.android.ui.components.OmniPrimaryButton
 import app.omnisim.android.ui.components.OmniSecondaryButton
 import app.omnisim.android.ui.components.OmniTextField
 import app.omnisim.android.ui.components.omniTextFieldColors
+import app.omnisim.android.ui.components.rememberCurrentDate
 import java.time.LocalDate
 import kotlin.math.hypot
 import kotlinx.coroutines.delay
@@ -92,6 +96,7 @@ import kotlinx.coroutines.launch
 
 private val cyclePresets = listOf(30, 60, 90, 120, 180, 365)
 private const val CustomCycle = -1
+private const val MonthlyCycle = -2
 private const val FormStepCount = 3
 private const val MinimumSavingDurationMillis = 1_000L
 private const val SuccessCheckDurationMillis = 520
@@ -113,9 +118,7 @@ fun AddEditSimScreen(
     modifier: Modifier = Modifier,
 ) {
     val initialCycle = existing?.renewalCycleDays ?: 90
-    val initialActivationDate = existing?.lastRenewalDate
-        ?: existing?.renewalCycleDays?.let { existing.nextRenewalDate.minusDays(it.toLong()) }
-        ?: LocalDate.now()
+    val today = rememberCurrentDate()
     val configuration = LocalConfiguration.current
     @Suppress("DEPRECATION")
     val locale = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -139,23 +142,25 @@ fun AddEditSimScreen(
     var attemptedStep by remember(existing?.id) { mutableStateOf(false) }
     var name by remember(existing?.id) { mutableStateOf(existing?.name.orEmpty()) }
     var carrier by remember(existing?.id) { mutableStateOf(existing?.carrier.orEmpty()) }
+    var planName by remember(existing?.id) { mutableStateOf(existing?.planName.orEmpty()) }
     var selectedRegionCode by remember(existing?.id) { mutableStateOf(initialRegionCode) }
     var nationalNumber by remember(existing?.id) {
         mutableStateOf(initialPhoneParts.nationalNumber)
     }
     var simType by remember(existing?.id) { mutableStateOf(existing?.simType ?: "eSIM") }
-    var activationDate by remember(existing?.id) { mutableStateOf(initialActivationDate) }
+    var lastRenewalDate by remember(existing?.id) { mutableStateOf(existing?.lastRenewalDate) }
     var nextDate by remember(existing?.id) {
         mutableStateOf(
             existing?.nextRenewalDate
-                ?: calculateNextRenewalDate(initialActivationDate, initialCycle),
+                ?: calculateNextRenewalDate(today, initialCycle),
         )
     }
     var cycleSelection by remember(existing?.id) {
         mutableStateOf<Int?>(
-            when (existing?.renewalCycleDays) {
-                null -> if (existing == null) 90 else null
-                in cyclePresets -> existing.renewalCycleDays
+            when {
+                existing?.renewalDayOfMonth != null -> MonthlyCycle
+                existing?.renewalCycleDays == null -> if (existing == null) 90 else null
+                existing.renewalCycleDays in cyclePresets -> existing.renewalCycleDays
                 else -> CustomCycle
             },
         )
@@ -166,6 +171,12 @@ fun AddEditSimScreen(
                 ?.takeIf { it !in cyclePresets }
                 ?.toString()
                 .orEmpty(),
+        )
+    }
+    var monthlyDay by remember(existing?.id) {
+        mutableStateOf(
+            (existing?.renewalDayOfMonth ?: existing?.nextRenewalDate?.dayOfMonth ?: today.dayOfMonth)
+                .toString(),
         )
     }
     var price by remember(existing?.id) { mutableStateOf(existing?.renewalPrice?.toString().orEmpty()) }
@@ -183,16 +194,18 @@ fun AddEditSimScreen(
 
     val cycle = when (cycleSelection) {
         CustomCycle -> customCycle.toIntOrNull()
+        MonthlyCycle -> null
         else -> cycleSelection
     }
+    val renewalDayOfMonth = monthlyDay.toIntOrNull().takeIf { cycleSelection == MonthlyCycle }
     val parsedPrice = price.toDoubleOrNull()
     val selectedCountry = countries.firstOrNull { it.regionCode == selectedRegionCode }
         ?: countries.first { it.regionCode == "US" }
     val phone = remember(selectedCountry.regionCode, nationalNumber) {
         formatInternationalPhoneNumber(selectedCountry.regionCode, nationalNumber).orEmpty()
     }
-    val savedCountryCode = selectedCountry.regionCode.takeIf { nationalNumber.isNotBlank() }
-    val savedCountryName = selectedCountry.countryName.takeIf { nationalNumber.isNotBlank() }
+    val savedCountryCode = selectedCountry.regionCode
+    val savedCountryName = selectedCountry.countryName
 
     @StringRes val identityError = when {
         name.isBlank() -> R.string.error_name_required
@@ -203,7 +216,10 @@ fun AddEditSimScreen(
     @StringRes val renewalError = when {
         cycleSelection == CustomCycle && customCycle.toIntOrNull() == null ->
             R.string.error_valid_custom_cycle
-        cycle == null || cycle <= 0 -> R.string.error_positive_cycle
+        cycleSelection == CustomCycle && (cycle ?: 0) <= 0 -> R.string.error_positive_cycle
+        cycleSelection == MonthlyCycle &&
+            (renewalDayOfMonth == null || renewalDayOfMonth !in 1..31) ->
+            R.string.error_monthly_renewal_day
         else -> 0
     }
     @StringRes val costError = when {
@@ -228,10 +244,11 @@ fun AddEditSimScreen(
         countryName = savedCountryName,
         phoneNumber = phone,
         simType = simType,
-        planName = existing?.planName,
-        lastRenewalDate = activationDate,
+        planName = planName,
+        lastRenewalDate = lastRenewalDate,
         nextRenewalDate = nextDate,
         renewalCycleDays = cycle,
+        renewalDayOfMonth = renewalDayOfMonth,
         renewalPrice = parsedPrice,
         currency = currency,
         renewalUrl = renewalUrl,
@@ -241,6 +258,9 @@ fun AddEditSimScreen(
     val cycleLabel = when (cycleSelection) {
         null -> stringResource(R.string.no_automatic_cycle)
         CustomCycle -> stringResource(R.string.custom)
+        MonthlyCycle -> renewalDayOfMonth?.let {
+            stringResource(R.string.monthly_on_day, it)
+        } ?: stringResource(R.string.monthly_fixed_day)
         else -> pluralStringResource(
             R.plurals.cycle_days_option,
             cycleSelection ?: 0,
@@ -288,6 +308,12 @@ fun AddEditSimScreen(
                             isError = attemptedStep && carrier.isBlank(),
                             modifier = Modifier.fillMaxWidth(),
                         )
+                        OmniTextField(
+                            value = planName,
+                            onValueChange = { planName = it },
+                            label = stringResource(R.string.plan_name_optional),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                         CountryPhoneField(
                             countries = countries,
                             selectedCountry = selectedCountry,
@@ -315,16 +341,34 @@ fun AddEditSimScreen(
                     }
 
                     1 -> {
-                        DateField(
-                            label = stringResource(R.string.activation_date),
-                            value = activationDate,
-                            onValueChange = { selectedDate ->
-                                activationDate = selectedDate
-                                cycle?.takeIf { it > 0 }?.let {
-                                    nextDate = calculateNextRenewalDate(selectedDate, it)
-                                }
+                        lastRenewalDate?.let { currentLastRenewalDate ->
+                            DateField(
+                                label = stringResource(R.string.last_renewal),
+                                value = currentLastRenewalDate,
+                                onValueChange = { selectedDate ->
+                                    lastRenewalDate = selectedDate
+                                    calculateScheduledNextRenewalDate(
+                                        selectedDate,
+                                        cycle,
+                                        renewalDayOfMonth,
+                                    )?.let { nextDate = it }
+                                },
+                            )
+                            TextButton(onClick = { lastRenewalDate = null }) {
+                                Text(stringResource(R.string.clear_last_renewal_date))
+                            }
+                        } ?: TextButton(
+                            onClick = {
+                                lastRenewalDate = today
+                                calculateScheduledNextRenewalDate(
+                                    today,
+                                    cycle,
+                                    renewalDayOfMonth,
+                                )?.let { nextDate = it }
                             },
-                        )
+                        ) {
+                            Text(stringResource(R.string.add_last_renewal_date))
+                        }
                         CycleField(
                             label = cycleLabel,
                             expanded = cycleExpanded,
@@ -332,8 +376,15 @@ fun AddEditSimScreen(
                             onSelected = { selectedCycle ->
                                 cycleSelection = selectedCycle
                                 cycleExpanded = false
-                                selectedCycle.takeIf { it > 0 }?.let {
-                                    nextDate = calculateNextRenewalDate(activationDate, it)
+                                val selectedCycleDays = selectedCycle?.takeIf { it > 0 }
+                                val selectedMonthlyDay = monthlyDay.toIntOrNull()
+                                    ?.takeIf { selectedCycle == MonthlyCycle && it in 1..31 }
+                                calculateScheduledNextRenewalDate(
+                                    lastRenewalDate ?: today,
+                                    selectedCycleDays,
+                                    selectedMonthlyDay,
+                                )?.let {
+                                    nextDate = it
                                 }
                             },
                         )
@@ -343,12 +394,32 @@ fun AddEditSimScreen(
                                 onValueChange = { value ->
                                     customCycle = value.filter(Char::isDigit)
                                     customCycle.toIntOrNull()?.takeIf { it > 0 }?.let {
-                                        nextDate = calculateNextRenewalDate(activationDate, it)
+                                        nextDate = calculateNextRenewalDate(lastRenewalDate ?: today, it)
                                     }
                                 },
                                 label = stringResource(R.string.custom_holding_cycle_days),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 isError = attemptedStep && (customCycle.toIntOrNull() ?: 0) <= 0,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                        if (cycleSelection == MonthlyCycle) {
+                            OmniTextField(
+                                value = monthlyDay,
+                                onValueChange = { value ->
+                                    monthlyDay = value.filter(Char::isDigit).take(2)
+                                    monthlyDay.toIntOrNull()?.takeIf { it in 1..31 }?.let { day ->
+                                        nextDate = calculateScheduledNextRenewalDate(
+                                            lastRenewalDate ?: today,
+                                            null,
+                                            day,
+                                        ) ?: nextDate
+                                    }
+                                },
+                                label = stringResource(R.string.monthly_day_of_month),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                isError = attemptedStep &&
+                                    (renewalDayOfMonth == null || renewalDayOfMonth !in 1..31),
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
@@ -358,7 +429,13 @@ fun AddEditSimScreen(
                             onValueChange = { nextDate = it },
                         )
                         Text(
-                            text = stringResource(R.string.next_holding_date_hint),
+                            text = stringResource(
+                                if (cycleSelection == null) {
+                                    R.string.next_holding_date_manual_hint
+                                } else {
+                                    R.string.next_holding_date_hint
+                                },
+                            ),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -690,7 +767,7 @@ private fun SimTypeField(
 
                 Surface(
                     modifier = Modifier
-                        .offset(x = indicatorOffset)
+                        .offset { IntOffset(indicatorOffset.roundToPx(), 0) }
                         .width(itemWidth)
                         .fillMaxHeight(),
                     color = MaterialTheme.colorScheme.primaryContainer,
@@ -740,7 +817,7 @@ private fun CycleField(
     label: String,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
-    onSelected: (Int) -> Unit,
+    onSelected: (Int?) -> Unit,
 ) {
     Column {
         Text(
@@ -762,12 +839,20 @@ private fun CycleField(
                     .fillMaxWidth(),
             )
             ExposedDropdownMenu(expanded = expanded, onDismissRequest = { onExpandedChange(false) }) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.no_automatic_cycle)) },
+                    onClick = { onSelected(null) },
+                )
                 cyclePresets.forEach { days ->
                     DropdownMenuItem(
                         text = { Text(pluralStringResource(R.plurals.cycle_days_option, days, days)) },
                         onClick = { onSelected(days) },
                     )
                 }
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.monthly_fixed_day)) },
+                    onClick = { onSelected(MonthlyCycle) },
+                )
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.custom)) },
                     onClick = { onSelected(CustomCycle) },

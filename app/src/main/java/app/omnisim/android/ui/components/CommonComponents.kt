@@ -52,7 +52,7 @@ import androidx.compose.ui.unit.dp
 import app.omnisim.android.R
 import app.omnisim.android.data.local.entity.SimEntity
 import app.omnisim.android.domain.model.RenewalStatus
-import app.omnisim.android.domain.util.calculateNextRenewalDate
+import app.omnisim.android.domain.util.calculateScheduledNextRenewalDate
 import app.omnisim.android.domain.util.daysUntilRenewal
 import app.omnisim.android.domain.util.maskPhoneNumber
 import app.omnisim.android.ui.theme.OmniCardPadding
@@ -304,7 +304,11 @@ fun RenewalSheet(
     var renewalDate by remember(sim.id) { mutableStateOf(LocalDate.now()) }
     var nextRenewalDate by remember(sim.id) {
         mutableStateOf(
-            sim.renewalCycleDays?.let { calculateNextRenewalDate(LocalDate.now(), it) }
+            calculateScheduledNextRenewalDate(
+                LocalDate.now(),
+                sim.renewalCycleDays,
+                sim.renewalDayOfMonth,
+            )
                 ?: sim.nextRenewalDate,
         )
     }
@@ -313,8 +317,12 @@ fun RenewalSheet(
     val parsedAmount = amount.toDoubleOrNull()
     val amountValid = amount.isBlank() || (parsedAmount != null && parsedAmount >= 0)
 
-    LaunchedEffect(renewalDate, sim.renewalCycleDays) {
-        sim.renewalCycleDays?.let { nextRenewalDate = calculateNextRenewalDate(renewalDate, it) }
+    LaunchedEffect(renewalDate, sim.renewalCycleDays, sim.renewalDayOfMonth) {
+        calculateScheduledNextRenewalDate(
+            renewalDate,
+            sim.renewalCycleDays,
+            sim.renewalDayOfMonth,
+        )?.let { nextRenewalDate = it }
     }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -345,6 +353,13 @@ fun RenewalSheet(
                 sim.renewalCycleDays?.let { cycleDays ->
                     Text(
                         stringResource(R.string.cycle_calculation_hint, cycleDays),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                sim.renewalDayOfMonth?.let { dayOfMonth ->
+                    Text(
+                        stringResource(R.string.monthly_calculation_hint, dayOfMonth),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -446,7 +461,9 @@ fun OmniTextField(
             supportingText = supportingText,
             colors = omniTextFieldColors(),
             shape = MaterialTheme.shapes.medium,
-            modifier = textFieldModifier.fillMaxWidth(),
+            modifier = textFieldModifier
+                .semantics { contentDescription = label }
+                .fillMaxWidth(),
         )
     }
 }

@@ -15,14 +15,19 @@ import app.omnisim.android.data.local.entity.RenewalHistoryEntity
 import app.omnisim.android.data.local.entity.SimEntity
 import app.omnisim.android.data.preferences.AppSettings
 import app.omnisim.android.data.preferences.ThemeMode
+import app.omnisim.android.data.update.AppReleaseInfo
+import app.omnisim.android.data.update.compareVersionNames
+import app.omnisim.android.domain.util.isSupportedCurrencyCode
 import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -49,6 +54,16 @@ sealed interface ExchangeRateUiState {
     ) : ExchangeRateUiState
 }
 
+sealed interface AppUpdateUiState {
+    data object Idle : AppUpdateUiState
+    data object Checking : AppUpdateUiState
+    data object Failed : AppUpdateUiState
+
+    data class UpToDate(val latestVersion: String) : AppUpdateUiState
+
+    data class Available(val release: AppReleaseInfo) : AppUpdateUiState
+}
+
 data class SimDraft(
     val id: String? = null,
     val name: String,
@@ -61,6 +76,7 @@ data class SimDraft(
     val lastRenewalDate: LocalDate?,
     val nextRenewalDate: LocalDate,
     val renewalCycleDays: Int?,
+    val renewalDayOfMonth: Int?,
     val renewalPrice: Double?,
     val currency: String?,
     val renewalUrl: String?,
@@ -69,15 +85,33 @@ data class SimDraft(
 
 data class UiMessage(@param:StringRes val text: Int)
 
-fun validateSimDraft(draft: SimDraft): String? = when {
-    draft.name.isBlank() -> "Name is required"
-    draft.carrier.isBlank() -> "Carrier is required"
-    draft.simType !in setOf("eSIM", "Physical SIM") -> "Choose a valid SIM type"
+enum class SimDraftValidationError {
+    NameRequired,
+    CarrierRequired,
+    InvalidSimType,
+    InvalidCycle,
+    InvalidMonthlyDay,
+    ConflictingSchedule,
+    InvalidPrice,
+    InvalidCurrency,
+    InvalidWebsite,
+}
+
+fun validateSimDraft(draft: SimDraft): SimDraftValidationError? = when {
+    draft.name.isBlank() -> SimDraftValidationError.NameRequired
+    draft.carrier.isBlank() -> SimDraftValidationError.CarrierRequired
+    draft.simType !in setOf("eSIM", "Physical SIM") -> SimDraftValidationError.InvalidSimType
     draft.renewalCycleDays != null && draft.renewalCycleDays <= 0 ->
-        "Renewal cycle must be positive"
+        SimDraftValidationError.InvalidCycle
+    draft.renewalDayOfMonth != null && draft.renewalDayOfMonth !in 1..31 ->
+        SimDraftValidationError.InvalidMonthlyDay
+    draft.renewalCycleDays != null && draft.renewalDayOfMonth != null ->
+        SimDraftValidationError.ConflictingSchedule
     draft.renewalPrice != null && (draft.renewalPrice < 0 || !draft.renewalPrice.isFinite()) ->
-        "Renewal price cannot be negative"
-    !isSafeWebUrl(draft.renewalUrl) -> "Use a valid http or https website"
+        SimDraftValidationError.InvalidPrice
+    !draft.currency.isNullOrBlank() && !isSupportedCurrencyCode(draft.currency) ->
+        SimDraftValidationError.InvalidCurrency
+    !isSafeWebUrl(draft.renewalUrl) -> SimDraftValidationError.InvalidWebsite
     else -> null
 }
 
@@ -85,8 +119,13 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     private val pendingRestore = MutableStateFlow<BackupPayload?>(null)
     private val exchangeRates = MutableStateFlow<ExchangeRateUiState>(ExchangeRateUiState.Idle)
     private val messagesChannel = Channel<UiMessage>(Channel.BUFFERED)
+    private val _appUpdateState = MutableStateFlow<AppUpdateUiState>(AppUpdateUiState.Idle)
     private var exchangeRateRefreshJob: Job? = null
+    private var appUpdateJob: Job? = null
+    private var automaticUpdateCheckStarted = false
+    private var showUpdateCheckResult = false
     val messages = messagesChannel.receiveAsFlow()
+    val appUpdateState: StateFlow<AppUpdateUiState> = _appUpdateState.asStateFlow()
 
     val uiState: StateFlow<AppUiState> = combine(
         container.simRepository.observeSims(),
@@ -129,6 +168,61 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
+    fun checkForUpdates(currentVersion: String) {
+        startUpdateCheck(currentVersion, showResult = true)
+    }
+
+    fun checkForUpdatesOnLaunch(currentVersion: String) {
+        if (automaticUpdateCheckStarted) return
+        automaticUpdateCheckStarted = true
+        startUpdateCheck(currentVersion, showResult = false)
+    }
+
+    private fun startUpdateCheck(currentVersion: String, showResult: Boolean) {
+        if (appUpdateJob?.isActive == true) {
+            if (showResult) {
+                showUpdateCheckResult = true
+                _appUpdateState.value = AppUpdateUiState.Checking
+            }
+            return
+        }
+        showUpdateCheckResult = showResult
+        _appUpdateState.value = if (showResult) {
+            AppUpdateUiState.Checking
+        } else {
+            AppUpdateUiState.Idle
+        }
+        appUpdateJob = viewModelScope.launch {
+            try {
+                val release = container.appUpdateRepository.getLatestRelease()
+                _appUpdateState.value = if (
+                    compareVersionNames(release.version, currentVersion) > 0
+                ) {
+                    AppUpdateUiState.Available(release)
+                } else if (showUpdateCheckResult) {
+                    AppUpdateUiState.UpToDate(release.version)
+                } else {
+                    AppUpdateUiState.Idle
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _appUpdateState.value = if (showUpdateCheckResult) {
+                    AppUpdateUiState.Failed
+                } else {
+                    AppUpdateUiState.Idle
+                }
+            }
+        }
+    }
+
+    fun dismissUpdateDialog() {
+        appUpdateJob?.cancel()
+        appUpdateJob = null
+        showUpdateCheckResult = false
+        _appUpdateState.value = AppUpdateUiState.Idle
+    }
+
     fun saveSim(draft: SimDraft, onResult: (Boolean) -> Unit) {
         val error = validateSimDraft(draft)
         if (error != null) {
@@ -153,6 +247,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
                         lastRenewalDate = draft.lastRenewalDate,
                         nextRenewalDate = draft.nextRenewalDate,
                         renewalCycleDays = draft.renewalCycleDays,
+                        renewalDayOfMonth = draft.renewalDayOfMonth,
                         renewalPrice = draft.renewalPrice,
                         currency = draft.currency.nullIfBlank()?.uppercase(),
                         renewalUrl = draft.renewalUrl.nullIfBlank(),
@@ -274,14 +369,16 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
 }
 
 @StringRes
-private fun String.toMessageResource(): Int = when (this) {
-    "Name is required" -> R.string.error_name_required
-    "Carrier is required" -> R.string.error_carrier_required
-    "Choose a valid SIM type" -> R.string.error_invalid_sim_type
-    "Renewal cycle must be positive" -> R.string.error_positive_cycle
-    "Renewal price cannot be negative" -> R.string.error_non_negative_price
-    "Use a valid http or https website" -> R.string.error_valid_website
-    else -> R.string.message_sim_save_failed
+private fun SimDraftValidationError.toMessageResource(): Int = when (this) {
+    SimDraftValidationError.NameRequired -> R.string.error_name_required
+    SimDraftValidationError.CarrierRequired -> R.string.error_carrier_required
+    SimDraftValidationError.InvalidSimType -> R.string.error_invalid_sim_type
+    SimDraftValidationError.InvalidCycle -> R.string.error_positive_cycle
+    SimDraftValidationError.InvalidMonthlyDay -> R.string.error_monthly_renewal_day
+    SimDraftValidationError.ConflictingSchedule -> R.string.error_single_renewal_schedule
+    SimDraftValidationError.InvalidPrice -> R.string.error_non_negative_price
+    SimDraftValidationError.InvalidCurrency -> R.string.error_valid_currency
+    SimDraftValidationError.InvalidWebsite -> R.string.error_valid_website
 }
 
 class AppViewModelFactory(private val container: AppContainer) : ViewModelProvider.Factory {

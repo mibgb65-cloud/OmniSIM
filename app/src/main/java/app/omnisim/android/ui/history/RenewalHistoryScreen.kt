@@ -49,10 +49,10 @@ import app.omnisim.android.domain.util.RenewalHistoryRange
 import app.omnisim.android.domain.util.filterRenewalHistory
 import app.omnisim.android.ui.components.SimAvatar
 import app.omnisim.android.ui.components.displayDate
+import app.omnisim.android.ui.components.rememberCurrentDate
 import app.omnisim.android.ui.theme.OmniCardPadding
 import app.omnisim.android.ui.theme.OmniScreenPadding
 import app.omnisim.android.ui.theme.OmniSectionSpacing
-import java.time.LocalDate
 import java.util.Locale
 
 @Composable
@@ -61,7 +61,7 @@ fun RenewalHistoryScreen(
     sims: List<SimEntity>,
     onOpenSim: (String) -> Unit,
 ) {
-    val today = LocalDate.now()
+    val today = rememberCurrentDate()
     var selectedSimId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedRange by rememberSaveable { mutableStateOf(RenewalHistoryRange.All) }
     var showSimMenu by remember { mutableStateOf(false) }

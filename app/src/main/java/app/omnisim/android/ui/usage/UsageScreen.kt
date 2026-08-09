@@ -81,7 +81,11 @@ fun UsageScreen(
     }
     val costs = remember(activeSims, defaultCurrency) {
         activeSims.mapNotNull { sim ->
-            calculateDailyHoldingCost(sim.renewalPrice, sim.renewalCycleDays)?.let { daily ->
+            calculateDailyHoldingCost(
+                sim.renewalPrice,
+                sim.renewalCycleDays,
+                sim.renewalDayOfMonth,
+            )?.let { daily ->
                 SimCost(
                     sim = sim,
                     currency = sim.currency
@@ -551,13 +555,22 @@ private fun SimCostRow(cost: SimCost, onClick: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    pluralStringResource(
-                        R.plurals.cost_cycle_value,
-                        cost.sim.renewalCycleDays ?: 0,
-                        cost.currency,
-                        formatCost(cost.sim.renewalPrice ?: 0.0),
-                        cost.sim.renewalCycleDays ?: 0,
-                    ),
+                    if (cost.sim.renewalDayOfMonth != null) {
+                        stringResource(
+                            R.string.cost_monthly_value,
+                            cost.currency,
+                            formatCost(cost.sim.renewalPrice ?: 0.0),
+                            cost.sim.renewalDayOfMonth,
+                        )
+                    } else {
+                        pluralStringResource(
+                            R.plurals.cost_cycle_value,
+                            cost.sim.renewalCycleDays ?: 0,
+                            cost.currency,
+                            formatCost(cost.sim.renewalPrice ?: 0.0),
+                            cost.sim.renewalCycleDays ?: 0,
+                        )
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

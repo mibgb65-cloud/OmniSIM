@@ -6,6 +6,7 @@ import app.omnisim.android.data.exchange.ExchangeRateRepository
 import app.omnisim.android.data.local.OmniSimDatabase
 import app.omnisim.android.data.preferences.SettingsRepository
 import app.omnisim.android.data.repository.SimRepository
+import app.omnisim.android.data.update.AppUpdateRepository
 import app.omnisim.android.notification.NotificationHelper
 import app.omnisim.android.notification.ReminderScheduler
 
@@ -26,6 +27,7 @@ class AppContainer(application: Application) {
     val simRepository = SimRepository(database)
     val settingsRepository = SettingsRepository(application)
     val exchangeRateRepository = ExchangeRateRepository(application)
+    val appUpdateRepository = AppUpdateRepository()
     val backupManager = BackupManager(application.contentResolver, database, settingsRepository)
     val reminderScheduler = ReminderScheduler(application)
 }

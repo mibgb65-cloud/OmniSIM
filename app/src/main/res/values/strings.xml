@@ -40,12 +40,14 @@
     <string name="renewal_date">Renewal date</string>
     <string name="next_renewal">Next renewal</string>
     <string name="cycle_calculation_hint">Calculated from a %1$d-day cycle. Tap the date to change it.</string>
+    <string name="monthly_calculation_hint">Calculated for day %1$d of each month. Short months use their final day.</string>
     <string name="amount">Amount</string>
     <string name="notes_optional">Notes (optional)</string>
     <string name="confirm_renewal">Confirm renewal</string>
     <string name="error_non_negative_amount">Enter a non-negative amount</string>
     <string name="action_ok">OK</string>
     <string name="action_cancel">Cancel</string>
+    <string name="action_retry">Retry</string>
 
     <string name="search_sims">Search SIMs</string>
     <string name="filter_active">Active</string>
@@ -89,6 +91,7 @@
     <string name="no_cost_data_description">Add a renewal price and cycle to an active SIM to calculate its daily holding cost.</string>
     <string name="cost_setup_title">Complete cost details</string>
     <string name="cost_setup_sim_hint">Add a renewal price and cycle</string>
+    <string name="cost_monthly_value">%1$s %2$s monthly on day %3$d</string>
 
     <string name="sim_information">SIM information</string>
     <string name="sim_type">SIM type</string>
@@ -109,6 +112,9 @@
         <item quantity="other">Every %1$d days</item>
     </plurals>
     <string name="no_automatic_cycle">No automatic cycle</string>
+    <string name="monthly_fixed_day">Monthly on a fixed day</string>
+    <string name="monthly_on_day">Monthly on day %1$d</string>
+    <string name="monthly_day_of_month">Day of month (1–31)</string>
     <string name="price">Price</string>
     <string name="open_renewal_website">Open renewal website</string>
     <string name="action_edit">Edit</string>
@@ -167,7 +173,8 @@
     <string name="holding_cycle">Keep-alive cycle</string>
     <string name="custom_holding_cycle_days">Custom keep-alive cycle (days)</string>
     <string name="next_holding_date">Next keep-alive date</string>
-    <string name="next_holding_date_hint">Calculated from the activation date and cycle. Tap the date to adjust it for carrier-specific rules.</string>
+    <string name="next_holding_date_hint">Suggested from the selected renewal schedule. Tap the date to adjust it for carrier-specific rules.</string>
+    <string name="next_holding_date_manual_hint">No automatic schedule is selected. Set the next renewal date manually.</string>
     <string name="holding_cost_optional">Keep-alive cost (optional)</string>
     <string name="per_sim_currency_hint">Currency is saved separately for this SIM. The default currency is only used as a starting value.</string>
     <string name="add_last_renewal_date">Add last renewal date</string>
@@ -191,6 +198,8 @@
     <string name="error_carrier_required">Carrier is required</string>
     <string name="error_invalid_sim_type">Choose a valid SIM type</string>
     <string name="error_positive_cycle">Renewal cycle must be positive</string>
+    <string name="error_monthly_renewal_day">Enter a day from 1 to 31</string>
+    <string name="error_single_renewal_schedule">Choose either a day cycle or a monthly day</string>
     <string name="error_non_negative_price">Renewal price cannot be negative</string>
     <string name="error_valid_website">Use a valid http or https website</string>
     <string name="error_valid_custom_cycle">Enter a valid custom cycle</string>
@@ -238,6 +247,19 @@
     <string name="usage_guide">Usage guide</string>
     <string name="usage_guide_description">Learn the main SIM, renewal, reminder, cost, and backup workflows.</string>
     <string name="settings_about">About</string>
+    <string name="check_for_updates">Check for updates</string>
+    <string name="check_for_updates_description">Current version %1$s · Check the latest official release.</string>
+    <string name="checking_for_updates">Checking for updates</string>
+    <string name="checking_for_updates_description">Contacting the official OmniSIM release service…</string>
+    <string name="update_check_failed">Couldn’t check for updates</string>
+    <string name="update_check_failed_description">Check your internet connection and try again later.</string>
+    <string name="app_up_to_date">You’re up to date</string>
+    <string name="app_up_to_date_description">OmniSIM %1$s is the latest official version.</string>
+    <string name="update_available">OmniSIM %1$s is available</string>
+    <string name="current_and_latest_version">Current: %1$s · Latest: %2$s</string>
+    <string name="whats_new">What’s new</string>
+    <string name="no_release_notes">No release notes were provided.</string>
+    <string name="download_update">Download update</string>
     <string name="open_source_license">Open source under the MIT License.</string>
     <string name="background_limitation">Reminder checks are approximate. Android and manufacturer battery policies may delay background work.</string>
     <string name="privacy_local_first_title">Local-first by design</string>
@@ -250,9 +272,9 @@
     <string name="permission_status_not_required">Not required</string>
     <string name="open_system_permissions">Open system permission settings</string>
     <string name="privacy_network_title">Network access</string>
-    <string name="privacy_network_body">Internet access is used only to download the European Central Bank’s public daily exchange-rate file. The request contains no SIM records, phone numbers, prices, or dates; standard network metadata such as your IP address is visible to the rate service.</string>
+    <string name="privacy_network_body">Internet access is used to download the European Central Bank’s public daily exchange-rate file and to check GitHub for the latest official OmniSIM release once per cold start or when you check manually. These requests contain no SIM records, phone numbers, prices, or dates; standard network metadata such as your IP address is visible to those services.</string>
     <string name="privacy_files_title">Backups, restore, and external websites</string>
-    <string name="privacy_files_body">Backup and restore use Android’s document picker, so OmniSIM can access only files you choose and does not request broad storage access. Exported backups contain your SIM data and should be kept secure. Renewal links open in your browser without adding stored SIM data to the URL.</string>
+    <string name="privacy_files_body">Backup and restore use Android’s document picker, so OmniSIM can access only files you choose and does not request broad storage access. Exported backups contain your SIM data and should be kept secure. Renewal links and update downloads open in your browser without adding stored SIM data to the URL.</string>
     <string name="privacy_unused_permissions_title">Permissions OmniSIM does not use</string>
     <string name="privacy_unused_permissions_body">OmniSIM does not request contacts, SMS, phone, call log, location, camera, microphone, or broad storage access.</string>
     <string name="privacy_deletion_title">Deleting your data</string>

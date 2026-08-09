@@ -56,10 +56,10 @@ import app.omnisim.android.data.preferences.AppSettings
 import app.omnisim.android.domain.model.RenewalStatus
 import app.omnisim.android.domain.util.calculateRenewalStatus
 import app.omnisim.android.ui.components.SimSummaryRow
+import app.omnisim.android.ui.components.rememberCurrentDate
 import app.omnisim.android.ui.splash.rememberSystemAnimationsEnabled
 import app.omnisim.android.ui.theme.OmniRowSpacing
 import app.omnisim.android.ui.theme.OmniScreenPadding
-import java.time.LocalDate
 
 private enum class SimFilter(@param:StringRes val label: Int) {
     Active(R.string.filter_active),
@@ -89,8 +89,8 @@ fun SimListScreen(
     val showSearch = query.isNotBlank() || searchFocused || !listScrolled
     val animationsEnabled = rememberSystemAnimationsEnabled()
     val searchLabel = stringResource(R.string.search_sims)
-    val today = LocalDate.now()
-    val visible = remember(sims, query, filter, settings.warningPeriodDays) {
+    val today = rememberCurrentDate()
+    val visible = remember(sims, query, filter, settings.warningPeriodDays, today) {
         sims.filter { sim ->
             val status = calculateRenewalStatus(
                 today,

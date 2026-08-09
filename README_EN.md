@@ -47,13 +47,14 @@ Open → See the nearest renewal → Select a SIM → Renew through the carrier
 
 | Area | Capabilities |
 | --- | --- |
-| Renewal tracking | Date-sorted records, overdue/due-today/due-soon states, 30–365 day presets, and custom cycles |
+| Renewal tracking | Date-sorted records, overdue/due-today/due-soon states, day cycles, fixed monthly dates, and manual dates |
 | SIM profiles | Name, carrier, country/region, number, type, plan, renewal URL, and notes |
 | Renewal flow | Calculate from the actual renewal date, allow an override, and save history transactionally |
 | History | Per-SIM history plus a global timeline filterable by SIM and time range |
 | Reminders | Approximate daily WorkManager checks, multiple offsets, deduplication, and renewal rescheduling |
 | Cost | Store amount and currency; estimate a combined total using ECB reference rates |
 | Data | Local Room database, DataStore settings, versioned JSON backup, and transactional restore |
+| Updates | Silently check on cold start, with manual checks, release notes, and signed APK downloads in Settings |
 | Appearance | System/light/dark themes, optional Material You, Simplified Chinese, and English |
 | Privacy | Phone masking by default; no analytics, telemetry, advertising, accounts, or remote logging |
 
@@ -73,7 +74,7 @@ Core SIM management, renewal history, reminders, and backup work offline.
 | Topic | Behavior |
 | --- | --- |
 | Local data | Phone numbers, SIM details, dates, prices, and notes remain on the device |
-| Network access | Used only for public ECB reference rates or a renewal website opened by the user |
+| Network access | Used for public ECB rates and GitHub release metadata, or for renewal and update downloads opened by the user |
 | Rate requests | Never include SIM data, phone numbers, prices, or renewal dates; cached rates provide fallback |
 | Data collection | No analytics, telemetry, advertising, crash reporting, or remote logging |
 | Accounts and cloud | No accounts, login, cloud sync, or backend service |
@@ -85,7 +86,8 @@ The app declares only the permissions it needs:
 | `POST_NOTIFICATIONS` | Renewal notifications on Android 13+, requested only after the user enables reminders |
 | `INTERNET` | Download public European Central Bank reference-rate data |
 
-Renewal URLs are handed to an external browser; the app does not fetch their content.
+Renewal URLs and confirmed update downloads are handed to an external browser;
+version comparison and release notes stay inside the app.
 
 OmniSIM does not request contacts, SMS, phone, call-log, location, camera,
 microphone, or broad storage access.
