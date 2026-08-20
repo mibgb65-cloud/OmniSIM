@@ -4,18 +4,14 @@ import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
+import java.time.YearMonth
 import java.util.Locale
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -30,7 +26,24 @@ data class ExchangeRateSnapshot(
     val rateDate: LocalDate,
     val ratesPerEuro: Map<String, Double>,
     val fetchedAt: Instant,
+    val coverage: ExchangeRateCoverage = ExchangeRateCoverage.EcbDaily,
+    val ecbRateDate: LocalDate? = null,
+    val inforEuroRateMonth: YearMonth? = null,
+    val ecbCurrencies: Set<String> = emptySet(),
+    val inforEuroCurrencies: Set<String> = emptySet(),
 )
+
+enum class ExchangeRateCoverage {
+    EcbDaily,
+    EcbDailyWithInforEuroMonthly,
+    InforEuroMonthly,
+}
+
+enum class CurrencyRateSupport {
+    Daily,
+    Monthly,
+    Unavailable,
+}
 
 internal data class ParsedExchangeRates(
     val rateDate: LocalDate,
@@ -38,7 +51,20 @@ internal data class ParsedExchangeRates(
 )
 
 fun ExchangeRateSnapshot.isFresh(now: Instant = Instant.now()): Boolean =
-    fetchedAt.plus(CACHE_MAX_AGE).isAfter(now)
+    fetchedAt.plus(CACHE_MAX_AGE).isAfter(now) &&
+        (coverage != ExchangeRateCoverage.EcbDailyWithInforEuroMonthly ||
+            ecbCurrencies.isNotEmpty())
+
+fun ExchangeRateSnapshot.currencyRateSupport(currencyCode: String): CurrencyRateSupport {
+    val code = currencyCode.trim().uppercase(Locale.ROOT)
+    return when {
+        code in ecbCurrencies -> CurrencyRateSupport.Daily
+        code in inforEuroCurrencies -> CurrencyRateSupport.Monthly
+        code !in ratesPerEuro -> CurrencyRateSupport.Unavailable
+        coverage == ExchangeRateCoverage.EcbDaily -> CurrencyRateSupport.Daily
+        else -> CurrencyRateSupport.Monthly
+    }
+}
 
 fun interface ExchangeRateSource {
     suspend fun fetch(): ExchangeRateSnapshot
@@ -47,34 +73,23 @@ fun interface ExchangeRateSource {
 class EcbExchangeRateSource(
     private val endpoint: String = ECB_DAILY_RATES_URL,
 ) : ExchangeRateSource {
-    override suspend fun fetch(): ExchangeRateSnapshot = withContext(Dispatchers.IO) {
-        val connection = URL(endpoint).openConnection() as HttpURLConnection
-        try {
-            connection.requestMethod = "GET"
-            connection.connectTimeout = 10_000
-            connection.readTimeout = 10_000
-            connection.setRequestProperty("Accept", "application/xml,text/xml")
-            connection.setRequestProperty("User-Agent", "OmniSIM/1.0")
-            val responseCode = connection.responseCode
-            if (responseCode !in 200..299) {
-                throw IOException("ECB exchange-rate request failed: HTTP $responseCode")
-            }
-            val xml = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-            val parsed = parseEcbExchangeRates(xml)
-            ExchangeRateSnapshot(
-                rateDate = parsed.rateDate,
-                ratesPerEuro = parsed.ratesPerEuro,
-                fetchedAt = Instant.now(),
-            )
-        } finally {
-            connection.disconnect()
-        }
+    override suspend fun fetch(): ExchangeRateSnapshot {
+        val xml = fetchExchangeRateDocument(endpoint, "application/xml,text/xml")
+        val parsed = parseEcbExchangeRates(xml)
+        return ExchangeRateSnapshot(
+            rateDate = parsed.rateDate,
+            ratesPerEuro = parsed.ratesPerEuro,
+            fetchedAt = Instant.now(),
+            coverage = ExchangeRateCoverage.EcbDaily,
+            ecbRateDate = parsed.rateDate,
+            ecbCurrencies = parsed.ratesPerEuro.keys,
+        )
     }
 }
 
 class ExchangeRateRepository(
     private val context: Context,
-    private val source: ExchangeRateSource = EcbExchangeRateSource(),
+    private val source: ExchangeRateSource = OfficialExchangeRateSource(),
 ) {
     private object Keys {
         val snapshot = stringPreferencesKey("snapshot")
@@ -92,6 +107,10 @@ class ExchangeRateRepository(
         val cached = getCachedSnapshot()
         if (cached != null && cached.isFresh(now)) return cached
 
+        return refresh()
+    }
+
+    suspend fun refresh(): ExchangeRateSnapshot {
         val fresh = source.fetch()
         context.exchangeRatesDataStore.edit { preferences ->
             preferences[Keys.snapshot] = json.encodeToString(fresh.toCached())
@@ -109,12 +128,22 @@ private data class CachedExchangeRateSnapshot(
     val rateDate: String,
     val ratesPerEuro: Map<String, Double>,
     val fetchedAtEpochMillis: Long,
+    val coverage: String = ExchangeRateCoverage.EcbDaily.name,
+    val ecbRateDate: String? = null,
+    val inforEuroRateMonth: String? = null,
+    val ecbCurrencies: Set<String> = emptySet(),
+    val inforEuroCurrencies: Set<String> = emptySet(),
 )
 
 private fun ExchangeRateSnapshot.toCached() = CachedExchangeRateSnapshot(
     rateDate = rateDate.toString(),
     ratesPerEuro = ratesPerEuro,
     fetchedAtEpochMillis = fetchedAt.toEpochMilli(),
+    coverage = coverage.name,
+    ecbRateDate = ecbRateDate?.toString(),
+    inforEuroRateMonth = inforEuroRateMonth?.toString(),
+    ecbCurrencies = ecbCurrencies,
+    inforEuroCurrencies = inforEuroCurrencies,
 )
 
 private fun CachedExchangeRateSnapshot.toSnapshot(): ExchangeRateSnapshot {
@@ -124,10 +153,39 @@ private fun CachedExchangeRateSnapshot.toSnapshot(): ExchangeRateSnapshot {
         .toMutableMap()
         .apply { put("EUR", 1.0) }
     require(validRates.size > 1) { "Cached exchange rates are empty" }
+    val parsedDate = LocalDate.parse(rateDate)
+    val parsedCoverage = runCatching { ExchangeRateCoverage.valueOf(coverage) }
+        .getOrDefault(ExchangeRateCoverage.EcbDaily)
+    val hasSourceMetadata = ecbRateDate != null || inforEuroRateMonth != null ||
+        ecbCurrencies.isNotEmpty() || inforEuroCurrencies.isNotEmpty()
+    val validCodes = validRates.keys
+    val migratedEcbCurrencies = if (hasSourceMetadata) {
+        ecbCurrencies.map { it.uppercase(Locale.ROOT) }.toSet() intersect validCodes
+    } else if (parsedCoverage == ExchangeRateCoverage.EcbDaily) {
+        validCodes
+    } else {
+        emptySet()
+    }
+    val migratedInforEuroCurrencies = if (hasSourceMetadata) {
+        inforEuroCurrencies.map { it.uppercase(Locale.ROOT) }.toSet() intersect validCodes
+    } else if (parsedCoverage != ExchangeRateCoverage.EcbDaily) {
+        validCodes
+    } else {
+        emptySet()
+    }
     return ExchangeRateSnapshot(
-        rateDate = LocalDate.parse(rateDate),
+        rateDate = parsedDate,
         ratesPerEuro = validRates,
         fetchedAt = Instant.ofEpochMilli(fetchedAtEpochMillis),
+        coverage = parsedCoverage,
+        ecbRateDate = ecbRateDate?.let(LocalDate::parse)
+            ?: parsedDate.takeIf { parsedCoverage != ExchangeRateCoverage.InforEuroMonthly },
+        inforEuroRateMonth = inforEuroRateMonth?.let(YearMonth::parse)
+            ?: YearMonth.from(parsedDate).takeIf {
+                parsedCoverage != ExchangeRateCoverage.EcbDaily
+            },
+        ecbCurrencies = migratedEcbCurrencies,
+        inforEuroCurrencies = migratedInforEuroCurrencies,
     )
 }
 

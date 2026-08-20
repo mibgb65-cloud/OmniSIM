@@ -22,7 +22,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,7 +34,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.omnisim.android.R
+import app.omnisim.android.data.local.entity.RenewalHistoryEntity
 import app.omnisim.android.data.local.entity.SimEntity
+import app.omnisim.android.domain.util.calculateActualSpend
 import app.omnisim.android.domain.util.CurrencyAmount
 import app.omnisim.android.domain.util.ConvertedCostTotal
 import app.omnisim.android.domain.util.calculateDailyHoldingCost
@@ -44,6 +45,7 @@ import app.omnisim.android.ui.ExchangeRateUiState
 import app.omnisim.android.ui.components.SimAvatar
 import app.omnisim.android.ui.components.OmniSectionHeader
 import app.omnisim.android.ui.components.displayDate
+import app.omnisim.android.ui.components.rememberCurrentDate
 import app.omnisim.android.ui.theme.OmniCardPadding
 import app.omnisim.android.ui.theme.OmniRowSpacing
 import app.omnisim.android.ui.theme.OmniScreenPadding
@@ -66,7 +68,7 @@ internal data class CurrencyCost(
 @Composable
 fun UsageScreen(
     sims: List<SimEntity>,
-    historyCount: Int,
+    history: List<RenewalHistoryEntity>,
     defaultCurrency: String,
     exchangeRateState: ExchangeRateUiState,
     onRefreshRates: () -> Unit,
@@ -74,8 +76,12 @@ fun UsageScreen(
     onOpenHistory: () -> Unit,
     bottomContentPadding: Dp,
 ) {
-    LaunchedEffect(Unit) { onRefreshRates() }
+    val today = rememberCurrentDate()
     val activeSims = remember(sims) { sims.filterNot(SimEntity::archived) }
+    val activeSimIds = remember(activeSims) { activeSims.mapTo(mutableSetOf(), SimEntity::id) }
+    val actualSpend = remember(history, activeSimIds, today) {
+        calculateActualSpend(history, activeSimIds, today)
+    }
     val targetCurrency = remember(defaultCurrency) {
         defaultCurrency.trim().uppercase(Locale.ROOT).ifBlank { "USD" }
     }
@@ -114,8 +120,8 @@ fun UsageScreen(
             ratesPerEuro = rateSnapshot?.ratesPerEuro.orEmpty(),
         )
     }
-    val needsExchangeRates = remember(costs, targetCurrency) {
-        costs.any { it.currency != targetCurrency }
+    val excludedCosts = remember(costs, convertedTotal.excludedCurrencies) {
+        costs.filter { it.currency in convertedTotal.excludedCurrencies }
     }
 
     LazyColumn(
@@ -130,9 +136,12 @@ fun UsageScreen(
     ) {
         item(key = "renewal-history-entry") {
             RenewalHistoryEntryCard(
-                historyCount = historyCount,
+                historyCount = history.size,
                 onClick = onOpenHistory,
             )
+        }
+        item(key = "actual-spend") {
+            ActualSpendCard(summary = actualSpend, onOpenHistory = onOpenHistory)
         }
         if (summaries.isEmpty()) {
             item {
@@ -150,7 +159,9 @@ fun UsageScreen(
                     convertedTotal = convertedTotal,
                     targetCurrency = targetCurrency,
                     exchangeRateState = exchangeRateState,
-                    needsExchangeRates = needsExchangeRates,
+                    excludedCosts = excludedCosts,
+                    onOpenSim = onOpenSim,
+                    onRefreshRates = onRefreshRates,
                 )
             }
             item {
@@ -243,7 +254,9 @@ private fun CostOverviewCard(
     convertedTotal: ConvertedCostTotal,
     targetCurrency: String,
     exchangeRateState: ExchangeRateUiState,
-    needsExchangeRates: Boolean,
+    excludedCosts: List<SimCost>,
+    onOpenSim: (String) -> Unit,
+    onRefreshRates: () -> Unit,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -271,15 +284,19 @@ private fun CostOverviewCard(
             if (convertedTotal.includedCount > 0) {
                 ConvertedTotalSummary(
                     total = convertedTotal,
-                    totalCostCount = includedCount,
                     targetCurrency = targetCurrency,
                     exchangeRateState = exchangeRateState,
-                    needsExchangeRates = needsExchangeRates,
+                    excludedCosts = excludedCosts,
+                    onOpenSim = onOpenSim,
+                    onRefreshRates = onRefreshRates,
                 )
             } else {
                 ExchangeRateUnavailableSummary(
                     targetCurrency = targetCurrency,
                     exchangeRateState = exchangeRateState,
+                    excludedCosts = excludedCosts,
+                    onOpenSim = onOpenSim,
+                    onRefreshRates = onRefreshRates,
                 )
             }
             Spacer(Modifier.height(10.dp))

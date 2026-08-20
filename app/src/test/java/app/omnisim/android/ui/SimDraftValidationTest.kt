@@ -60,4 +60,14 @@ class SimDraftValidationTest {
             validateSimDraft(draft().copy(currency = "ZZZ")),
         )
     }
+
+    @Test
+    fun `currency supplied by an official rate snapshot is valid`() {
+        assertNull(
+            validateSimDraft(
+                draft().copy(currency = "QZZ"),
+                officialCurrencyCodes = setOf("QZZ"),
+            ),
+        )
+    }
 }

@@ -93,6 +93,7 @@ import app.omnisim.android.R
 import app.omnisim.android.data.preferences.CURRENT_LEGAL_CONSENT_VERSION
 import app.omnisim.android.data.update.isTrustedUpdateDownloadUrl
 import app.omnisim.android.ui.AppViewModel
+import app.omnisim.android.ui.appUpdateStateForRoute
 import app.omnisim.android.ui.components.OmniCircleIconButton
 import app.omnisim.android.ui.components.OmniPageSurface
 import app.omnisim.android.ui.components.OmniPageTitleStyle
@@ -160,9 +161,9 @@ fun OmniSimApp(
     LaunchedEffect(canCheckForUpdates, viewModel) {
         if (canCheckForUpdates) {
             viewModel.checkForUpdatesOnLaunch(BuildConfig.VERSION_NAME)
+            viewModel.loadExchangeRates()
         }
     }
-
     LaunchedEffect(viewModel, resources) {
         viewModel.messages.collect { message ->
             snackbarHostState.showSnackbar(resources.getString(message.text))
@@ -283,7 +284,7 @@ fun OmniSimApp(
                     ) {
                         UsageScreen(
                             sims = state.sims,
-                            historyCount = state.history.size,
+                            history = state.history,
                             defaultCurrency = state.settings.defaultCurrency,
                             exchangeRateState = state.exchangeRates,
                             onRefreshRates = viewModel::refreshExchangeRates,
@@ -316,6 +317,7 @@ fun OmniSimApp(
                         SettingsScreen(
                             section = SettingsSection.Overview,
                             settings = state.settings,
+                            exchangeRateSnapshot = state.exchangeRateSnapshot,
                             appLanguage = AppLanguageController.current(),
                             pendingRestore = state.pendingRestore,
                             recoverySnapshotAvailable = state.recoverySnapshotAvailable,
@@ -378,6 +380,7 @@ fun OmniSimApp(
                         SettingsScreen(
                             section = section,
                             settings = state.settings,
+                            exchangeRateSnapshot = state.exchangeRateSnapshot,
                             appLanguage = AppLanguageController.current(),
                             pendingRestore = state.pendingRestore,
                             recoverySnapshotAvailable = state.recoverySnapshotAvailable,
@@ -513,6 +516,7 @@ fun OmniSimApp(
                             AddEditSimScreen(
                                 existing = sim,
                                 defaultCurrency = state.settings.defaultCurrency,
+                                exchangeRateSnapshot = state.exchangeRateSnapshot,
                                 onSave = viewModel::saveSim,
                                 onDone = { navController.popBackStack() },
                             )
@@ -539,6 +543,7 @@ fun OmniSimApp(
                             AddEditSimScreen(
                                 existing = null,
                                 defaultCurrency = state.settings.defaultCurrency,
+                                exchangeRateSnapshot = state.exchangeRateSnapshot,
                                 onSave = viewModel::saveSim,
                                 onDone = {
                                     showAddSim = false
@@ -577,7 +582,7 @@ fun OmniSimApp(
 
         if (hasLegalConsent && state.pendingRestore == null) {
             AppUpdateDialog(
-                state = appUpdateState,
+                state = appUpdateStateForRoute(appUpdateState, route == Routes.Home),
                 onRetry = { viewModel.checkForUpdates(BuildConfig.VERSION_NAME) },
                 onDownload = { url ->
                     if (isTrustedUpdateDownloadUrl(url)) uriHandler.openUri(url)

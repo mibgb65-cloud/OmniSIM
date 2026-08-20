@@ -9,6 +9,7 @@ import app.omnisim.android.AppContainer
 import app.omnisim.android.R
 import app.omnisim.android.backup.BackupPayload
 import app.omnisim.android.backup.isSafeWebUrl
+import app.omnisim.android.data.exchange.ExchangeRateSourcesUnavailableException
 import app.omnisim.android.data.exchange.ExchangeRateSnapshot
 import app.omnisim.android.data.exchange.isFresh
 import app.omnisim.android.data.local.entity.RenewalHistoryEntity
@@ -19,6 +20,7 @@ import app.omnisim.android.data.update.AppReleaseInfo
 import app.omnisim.android.data.update.compareVersionNames
 import app.omnisim.android.domain.util.isSupportedCurrencyCode
 import app.omnisim.android.domain.util.areReminderOffsetsValid
+import java.io.IOException
 import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
@@ -43,7 +45,10 @@ data class AppUiState(
     val pendingRestore: BackupPayload? = null,
     val recoverySnapshotAvailable: Boolean = false,
     val exchangeRates: ExchangeRateUiState = ExchangeRateUiState.Idle,
-)
+) {
+    val exchangeRateSnapshot: ExchangeRateSnapshot?
+        get() = (exchangeRates as? ExchangeRateUiState.Ready)?.snapshot
+}
 
 private data class RestoreUiState(
     val pendingRestore: BackupPayload?,
@@ -53,13 +58,39 @@ private data class RestoreUiState(
 sealed interface ExchangeRateUiState {
     data object Idle : ExchangeRateUiState
     data object Loading : ExchangeRateUiState
-    data object Unavailable : ExchangeRateUiState
+    data class Unavailable(val reason: ExchangeRateFailureReason) : ExchangeRateUiState
 
     data class Ready(
         val snapshot: ExchangeRateSnapshot,
         val isRefreshing: Boolean = false,
-        val refreshFailed: Boolean = false,
+        val refreshFailure: ExchangeRateFailureReason? = null,
     ) : ExchangeRateUiState
+}
+
+enum class ExchangeRateFailureReason {
+    NetworkOrService,
+    InvalidData,
+    Unknown,
+}
+
+internal fun Throwable.toExchangeRateFailureReason(): ExchangeRateFailureReason {
+    val failures = (this as? ExchangeRateSourcesUnavailableException)?.failures ?: listOf(this)
+    return when {
+        failures.any { error -> error.hasCause { it is IllegalArgumentException } } ->
+            ExchangeRateFailureReason.InvalidData
+        failures.any { error -> error.hasCause { it is IOException } } ->
+            ExchangeRateFailureReason.NetworkOrService
+        else -> ExchangeRateFailureReason.Unknown
+    }
+}
+
+private fun Throwable.hasCause(predicate: (Throwable) -> Boolean): Boolean {
+    var current: Throwable? = this
+    while (current != null) {
+        if (predicate(current)) return true
+        current = current.cause
+    }
+    return false
 }
 
 sealed interface AppUpdateUiState {
@@ -69,8 +100,18 @@ sealed interface AppUpdateUiState {
 
     data class UpToDate(val latestVersion: String) : AppUpdateUiState
 
-    data class Available(val release: AppReleaseInfo) : AppUpdateUiState
+    data class Available(
+        val release: AppReleaseInfo,
+        val userInitiated: Boolean,
+    ) : AppUpdateUiState
 }
+
+internal fun appUpdateStateForRoute(
+    state: AppUpdateUiState,
+    isHome: Boolean,
+): AppUpdateUiState = if (
+    state is AppUpdateUiState.Available && !state.userInitiated && !isHome
+) AppUpdateUiState.Idle else state
 
 data class SimDraft(
     val id: String? = null,
@@ -105,7 +146,10 @@ enum class SimDraftValidationError {
     InvalidWebsite,
 }
 
-fun validateSimDraft(draft: SimDraft): SimDraftValidationError? = when {
+fun validateSimDraft(
+    draft: SimDraft,
+    officialCurrencyCodes: Set<String> = emptySet(),
+): SimDraftValidationError? = when {
     draft.name.isBlank() -> SimDraftValidationError.NameRequired
     draft.carrier.isBlank() -> SimDraftValidationError.CarrierRequired
     draft.simType !in setOf("eSIM", "Physical SIM") -> SimDraftValidationError.InvalidSimType
@@ -117,7 +161,8 @@ fun validateSimDraft(draft: SimDraft): SimDraftValidationError? = when {
         SimDraftValidationError.ConflictingSchedule
     draft.renewalPrice != null && (draft.renewalPrice < 0 || !draft.renewalPrice.isFinite()) ->
         SimDraftValidationError.InvalidPrice
-    !draft.currency.isNullOrBlank() && !isSupportedCurrencyCode(draft.currency) ->
+    !draft.currency.isNullOrBlank() &&
+        !isSupportedCurrencyCode(draft.currency, officialCurrencyCodes) ->
         SimDraftValidationError.InvalidCurrency
     !isSafeWebUrl(draft.renewalUrl) -> SimDraftValidationError.InvalidWebsite
     else -> null
@@ -167,27 +212,42 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppUiState())
 
-    fun refreshExchangeRates() {
+    fun loadExchangeRates() = startExchangeRateRequest(force = false)
+
+    fun refreshExchangeRates() = startExchangeRateRequest(force = true)
+
+    private fun startExchangeRateRequest(force: Boolean) {
         if (exchangeRateRefreshJob?.isActive == true) return
         exchangeRateRefreshJob = viewModelScope.launch {
             val cached = runCatching {
                 container.exchangeRateRepository.getCachedSnapshot()
             }.getOrNull()
+            if (!force && cached?.isFresh() == true) {
+                exchangeRates.value = ExchangeRateUiState.Ready(cached)
+                return@launch
+            }
             exchangeRates.value = when {
                 cached == null -> ExchangeRateUiState.Loading
-                cached.isFresh() -> ExchangeRateUiState.Ready(cached)
                 else -> ExchangeRateUiState.Ready(cached, isRefreshing = true)
             }
 
-            runCatching { container.exchangeRateRepository.refreshIfStale() }
-                .onSuccess { exchangeRates.value = ExchangeRateUiState.Ready(it) }
-                .onFailure {
-                    exchangeRates.value = if (cached == null) {
-                        ExchangeRateUiState.Unavailable
-                    } else {
-                        ExchangeRateUiState.Ready(cached, refreshFailed = true)
-                    }
+            try {
+                val fresh = if (force) {
+                    container.exchangeRateRepository.refresh()
+                } else {
+                    container.exchangeRateRepository.refreshIfStale()
                 }
+                exchangeRates.value = ExchangeRateUiState.Ready(fresh)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                val reason = error.toExchangeRateFailureReason()
+                exchangeRates.value = if (cached == null) {
+                    ExchangeRateUiState.Unavailable(reason)
+                } else {
+                    ExchangeRateUiState.Ready(cached, refreshFailure = reason)
+                }
+            }
         }
     }
 
@@ -221,7 +281,10 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
                 _appUpdateState.value = if (
                     compareVersionNames(release.version, currentVersion) > 0
                 ) {
-                    AppUpdateUiState.Available(release)
+                    AppUpdateUiState.Available(
+                        release = release,
+                        userInitiated = showUpdateCheckResult,
+                    )
                 } else if (showUpdateCheckResult) {
                     AppUpdateUiState.UpToDate(release.version)
                 } else {
@@ -251,7 +314,12 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun saveSim(draft: SimDraft, onResult: (Boolean) -> Unit) {
-        val error = validateSimDraft(draft)
+        val officialCurrencyCodes = (exchangeRates.value as? ExchangeRateUiState.Ready)
+            ?.snapshot
+            ?.ratesPerEuro
+            ?.keys
+            .orEmpty()
+        val error = validateSimDraft(draft, officialCurrencyCodes)
         if (error != null) {
             messagesChannel.trySend(UiMessage(error.toMessageResource()))
             onResult(false)

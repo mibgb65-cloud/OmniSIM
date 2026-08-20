@@ -27,8 +27,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -65,6 +63,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import app.omnisim.android.BuildConfig
 import app.omnisim.android.R
 import app.omnisim.android.backup.BackupPayload
+import app.omnisim.android.data.exchange.ExchangeRateSnapshot
 import app.omnisim.android.data.preferences.AppSettings
 import app.omnisim.android.data.preferences.ThemeMode
 import app.omnisim.android.notification.NotificationAvailability
@@ -92,6 +91,7 @@ private val reminderOptions = advanceReminderOptions + dueReminderOptions
 fun SettingsScreen(
     section: SettingsSection,
     settings: AppSettings,
+    exchangeRateSnapshot: ExchangeRateSnapshot?,
     appLanguage: AppLanguage,
     pendingRestore: BackupPayload?,
     recoverySnapshotAvailable: Boolean,
@@ -119,6 +119,7 @@ fun SettingsScreen(
     bottomContentPadding: Dp,
 ) {
     val context = LocalContext.current
+    val dynamicColorSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     var customWarning by remember { mutableStateOf("") }
     var permissionGranted by remember {
         mutableStateOf(
@@ -164,35 +165,11 @@ fun SettingsScreen(
     ) {
         if (section == SettingsSection.Overview) {
             item {
-                SettingsActionCard(
-                    title = stringResource(R.string.settings_appearance_and_language),
-                    description = stringResource(R.string.settings_appearance_and_language_description),
-                    leadingIcon = Icons.Default.Settings,
-                    onClick = { onOpenSection(SettingsSection.Appearance) },
-                )
-            }
-            item {
-                SettingsActionCard(
-                    title = stringResource(R.string.settings_renewal_and_notifications),
-                    description = stringResource(R.string.settings_renewal_and_notifications_description),
-                    leadingIcon = Icons.Default.Notifications,
-                    onClick = { onOpenSection(SettingsSection.Renewal) },
-                )
-            }
-            item {
-                SettingsActionCard(
-                    title = stringResource(R.string.settings_data_and_privacy),
-                    description = stringResource(R.string.settings_data_and_privacy_description),
-                    leadingIcon = Icons.Default.Lock,
-                    onClick = { onOpenSection(SettingsSection.DataPrivacy) },
-                )
-            }
-            item {
-                SettingsActionCard(
-                    title = stringResource(R.string.settings_help_about),
-                    description = stringResource(R.string.settings_help_about_description),
-                    leadingIcon = Icons.Default.Info,
-                    onClick = { onOpenSection(SettingsSection.HelpAbout) },
+                SettingsOverview(
+                    settings = settings,
+                    appLanguage = appLanguage,
+                    notificationAvailability = notificationAvailability,
+                    onOpenSection = onOpenSection,
                 )
             }
         }
@@ -223,8 +200,12 @@ fun SettingsScreen(
                 HorizontalDivider(Modifier.padding(vertical = 10.dp))
                 SwitchSetting(
                     title = stringResource(R.string.dynamic_material_color),
-                    description = stringResource(R.string.dynamic_material_color_description),
-                    checked = settings.dynamicColor,
+                    description = stringResource(
+                        if (dynamicColorSupported) R.string.dynamic_material_color_description
+                        else R.string.dynamic_material_color_unsupported,
+                    ),
+                    checked = settings.dynamicColor && dynamicColorSupported,
+                    enabled = dynamicColorSupported,
                     onCheckedChange = onDynamicColor,
                 )
                 HorizontalDivider(Modifier.padding(vertical = 10.dp))
@@ -263,6 +244,11 @@ fun SettingsScreen(
                 Text(
                     stringResource(R.string.default_warning_period),
                     style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    stringResource(R.string.default_warning_period_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(8.dp))
                 FlowRow(
@@ -378,9 +364,19 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.titleSmall,
                         )
                         Text(
-                            stringResource(R.string.reminder_timing_description),
+                            stringResource(
+                                if (settings.reminderOffsets.isEmpty()) {
+                                    R.string.global_reminders_disabled
+                                } else {
+                                    R.string.reminder_timing_description
+                                },
+                            ),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = if (settings.reminderOffsets.isEmpty()) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
                         )
                     }
                     TextButton(
@@ -422,6 +418,7 @@ fun SettingsScreen(
                     selectedCode = settings.defaultCurrency,
                     onSelected = onDefaultCurrency,
                     label = stringResource(R.string.default_currency),
+                    exchangeRateSnapshot = exchangeRateSnapshot,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -537,7 +534,10 @@ fun SettingsScreen(
         }
         item {
             SettingsCard {
-                Text("OmniSIM ${BuildConfig.VERSION_NAME}", fontWeight = FontWeight.SemiBold)
+                Text(
+                    stringResource(R.string.app_version_label, BuildConfig.VERSION_NAME),
+                    fontWeight = FontWeight.SemiBold,
+                )
                 Text(
                     stringResource(R.string.app_subtitle),
                     style = MaterialTheme.typography.bodyMedium,

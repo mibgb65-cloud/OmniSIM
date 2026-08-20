@@ -44,6 +44,7 @@ import app.omnisim.android.data.local.entity.RenewalHistoryEntity
 import app.omnisim.android.data.local.entity.SimEntity
 import app.omnisim.android.data.preferences.AppSettings
 import app.omnisim.android.domain.util.calculateRenewalStatus
+import app.omnisim.android.domain.util.calculateLatestRenewalPriceChange
 import app.omnisim.android.domain.util.daysUntilRenewal
 import app.omnisim.android.domain.util.SupportedReminderOffsets
 import app.omnisim.android.domain.util.effectiveReminderOffsets
@@ -95,6 +96,9 @@ fun SimDetailScreen(
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     val latestHistoryId = remember(history) {
         history.maxByOrNull(RenewalHistoryEntity::createdAt)?.id
+    }
+    val priceChange = remember(history, sim.id) {
+        calculateLatestRenewalPriceChange(history, sim.id)
     }
 
     LazyColumn(
@@ -169,6 +173,7 @@ fun SimDetailScreen(
                             listOfNotNull(sim.currency, formatAmount(it)).joinToString(" "),
                         )
                     }
+                    priceChange?.let { RenewalPriceChangeRow(it) }
                     if (!sim.archived) {
                         Spacer(Modifier.height(18.dp))
                         OmniPrimaryButton(

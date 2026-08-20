@@ -44,6 +44,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.omnisim.android.R
+import app.omnisim.android.data.exchange.CurrencyRateSupport
+import app.omnisim.android.data.exchange.ExchangeRateSnapshot
+import app.omnisim.android.data.exchange.currencyRateSupport
 import app.omnisim.android.domain.util.CurrencyOption
 import app.omnisim.android.domain.util.currencyOptions
 import app.omnisim.android.domain.util.filterCurrencyOptions
@@ -54,11 +57,15 @@ fun CurrencyPickerField(
     selectedCode: String,
     onSelected: (String) -> Unit,
     label: String,
+    exchangeRateSnapshot: ExchangeRateSnapshot? = null,
     modifier: Modifier = Modifier,
 ) {
     val languageTag = LocalLocale.current.toLanguageTag()
     val locale = remember(languageTag) { Locale.forLanguageTag(languageTag) }
-    val currencies = remember(locale) { currencyOptions(locale) }
+    val officialCurrencyCodes = exchangeRateSnapshot?.ratesPerEuro?.keys.orEmpty()
+    val currencies = remember(locale, officialCurrencyCodes) {
+        currencyOptions(locale, officialCurrencyCodes)
+    }
     val selectedCurrency = currencies.firstOrNull { it.code.equals(selectedCode, ignoreCase = true) }
     var showPicker by rememberSaveable { mutableStateOf(false) }
 
@@ -114,6 +121,7 @@ fun CurrencyPickerField(
         CurrencyPickerSheet(
             currencies = currencies,
             selectedCode = selectedCode,
+            exchangeRateSnapshot = exchangeRateSnapshot,
             onSelected = { currency ->
                 onSelected(currency.code)
                 showPicker = false
@@ -123,8 +131,11 @@ fun CurrencyPickerField(
     }
 }
 
+@Composable
 private fun currencyFieldDetail(currency: CurrencyOption): String =
-    if (currency.symbol.equals(currency.code, ignoreCase = true)) {
+    if (currency.displayName.equals(currency.code, ignoreCase = true)) {
+        stringResource(R.string.currency_official_rate_name)
+    } else if (currency.symbol.equals(currency.code, ignoreCase = true)) {
         currency.displayName
     } else {
         "${currency.symbol} · ${currency.displayName}"
@@ -135,6 +146,7 @@ private fun currencyFieldDetail(currency: CurrencyOption): String =
 private fun CurrencyPickerSheet(
     currencies: List<CurrencyOption>,
     selectedCode: String,
+    exchangeRateSnapshot: ExchangeRateSnapshot?,
     onSelected: (CurrencyOption) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -183,6 +195,12 @@ private fun CurrencyPickerSheet(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
             )
+            Text(
+                text = stringResource(R.string.currency_rate_support_hint),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp),
+            )
             Spacer(Modifier.height(10.dp))
 
             if (filteredCurrencies.isEmpty()) {
@@ -196,6 +214,7 @@ private fun CurrencyPickerSheet(
                 LazyColumn(modifier = Modifier.fillMaxWidth()) {
                     items(filteredCurrencies, key = CurrencyOption::code) { currency ->
                         val selected = currency.code.equals(selectedCode, ignoreCase = true)
+                        val rateSupport = exchangeRateSnapshot?.currencyRateSupport(currency.code)
                         Surface(
                             onClick = { onSelected(currency) },
                             modifier = Modifier.fillMaxWidth(),
@@ -221,6 +240,15 @@ private fun CurrencyPickerSheet(
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
+                                    Text(
+                                        text = currencyRateSupportText(rateSupport),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (rateSupport == CurrencyRateSupport.Unavailable) {
+                                            MaterialTheme.colorScheme.error
+                                        } else {
+                                            MaterialTheme.colorScheme.primary
+                                        },
+                                    )
                                 }
                                 if (selected) {
                                     Icon(
@@ -239,3 +267,13 @@ private fun CurrencyPickerSheet(
         }
     }
 }
+
+@Composable
+private fun currencyRateSupportText(support: CurrencyRateSupport?): String = stringResource(
+    when (support) {
+        CurrencyRateSupport.Daily -> R.string.currency_rate_support_daily
+        CurrencyRateSupport.Monthly -> R.string.currency_rate_support_monthly
+        CurrencyRateSupport.Unavailable -> R.string.currency_rate_support_unavailable
+        null -> R.string.currency_rate_support_loading
+    },
+)

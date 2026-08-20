@@ -27,8 +27,8 @@ android {
         applicationId = "app.omnisim.android"
         minSdk = 23
         targetSdk = 36
-        versionCode = 8
-        versionName = "1.2.0"
+        versionCode = 9
+        versionName = "1.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true

@@ -55,6 +55,27 @@ class BackupCodecTest {
     }
 
     @Test
+    fun `official supplemental currencies round trip`() {
+        listOf("XCG", "ZIG").forEach { currency ->
+            val currencySim = sim.copy(currency = currency)
+            val currencyRenewal = renewal.copy(currency = currency)
+            val currencySettings = AppSettings(defaultCurrency = currency)
+
+            val decoded = BackupCodec.decode(
+                BackupCodec.encode(
+                    listOf(currencySim),
+                    listOf(currencyRenewal),
+                    currencySettings,
+                ),
+            )
+
+            assertEquals(listOf(currencySim), decoded.sims)
+            assertEquals(listOf(currencyRenewal), decoded.history)
+            assertEquals(currencySettings, decoded.settings)
+        }
+    }
+
+    @Test
     fun `invalid json is rejected`() {
         assertThrows(BackupValidationException::class.java) {
             BackupCodec.decode("not json")

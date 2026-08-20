@@ -74,6 +74,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import app.omnisim.android.R
 import app.omnisim.android.backup.isSafeWebUrl
+import app.omnisim.android.data.exchange.ExchangeRateSnapshot
 import app.omnisim.android.data.local.entity.SimEntity
 import app.omnisim.android.domain.util.callingCodeCountries
 import app.omnisim.android.domain.util.calculateNextRenewalDate
@@ -113,6 +114,7 @@ internal enum class SaveTransitionState {
 fun AddEditSimScreen(
     existing: SimEntity?,
     defaultCurrency: String,
+    exchangeRateSnapshot: ExchangeRateSnapshot?,
     onSave: (SimDraft, (Boolean) -> Unit) -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
@@ -226,7 +228,10 @@ fun AddEditSimScreen(
         price.isNotBlank() && parsedPrice == null -> R.string.error_valid_renewal_price
         parsedPrice != null && (parsedPrice < 0 || !parsedPrice.isFinite()) ->
             R.string.error_non_negative_price
-        !isSupportedCurrencyCode(currency) -> R.string.error_valid_currency
+        !isSupportedCurrencyCode(
+            currency,
+            exchangeRateSnapshot?.ratesPerEuro?.keys.orEmpty(),
+        ) -> R.string.error_valid_currency
         !isSafeWebUrl(renewalUrl) -> R.string.error_valid_website
         else -> 0
     }
@@ -456,6 +461,7 @@ fun AddEditSimScreen(
                                 selectedCode = currency,
                                 onSelected = { currency = it },
                                 label = stringResource(R.string.currency),
+                                exchangeRateSnapshot = exchangeRateSnapshot,
                                 modifier = Modifier.weight(0.62f),
                             )
                         }

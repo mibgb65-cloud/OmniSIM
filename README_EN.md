@@ -52,7 +52,7 @@ Open → See the nearest renewal → Select a SIM → Renew through the carrier
 | Renewal flow | Calculate from the actual renewal date, allow an override, and save history transactionally |
 | History | Per-SIM history plus a global timeline filterable by SIM and time range |
 | Reminders | Approximate daily WorkManager checks, multiple offsets, deduplication, and renewal rescheduling |
-| Cost | Store amount and currency; estimate a combined total using ECB reference rates |
+| Cost | Show 30/365-day actual spend and renewal-price changes, plus future estimates using ECB daily and European Commission monthly rates |
 | Data | Local Room database, DataStore settings, versioned JSON backup, and transactional restore |
 | Updates | Silently check on cold start, with manual checks, release notes, and signed APK downloads in Settings |
 | Appearance | System/light/dark themes, optional Material You, Simplified Chinese, and English |
@@ -74,7 +74,7 @@ Core SIM management, renewal history, reminders, and backup work offline.
 | Topic | Behavior |
 | --- | --- |
 | Local data | Phone numbers, SIM details, dates, prices, and notes remain on the device |
-| Network access | Used for public ECB rates and GitHub release metadata, or for renewal and update downloads opened by the user |
+| Network access | Used for public ECB and European Commission rates plus GitHub release metadata, or for renewal and update downloads opened by the user |
 | Rate requests | Never include SIM data, phone numbers, prices, or renewal dates; cached rates provide fallback |
 | Data collection | No analytics, telemetry, advertising, crash reporting, or remote logging |
 | Accounts and cloud | No accounts, login, cloud sync, or backend service |
@@ -84,7 +84,7 @@ The app declares only the permissions it needs:
 | Permission | Purpose |
 | --- | --- |
 | `POST_NOTIFICATIONS` | Renewal notifications on Android 13+, requested only after the user enables reminders |
-| `INTERNET` | Download public European Central Bank reference-rate data |
+| `INTERNET` | Download public European Central Bank and European Commission exchange-rate data and check official GitHub releases |
 
 Renewal URLs and confirmed update downloads are handed to an external browser;
 version comparison and release notes stay inside the app.
@@ -114,7 +114,8 @@ flowchart TD
     SETTINGS --> DATASTORE[(DataStore)]
     REMINDER --> WORK[WorkManager]
     VM --> RATE[ExchangeRateRepository]
-    RATE --> ECB[Public ECB reference rates]
+    RATE --> ECB[Public ECB daily reference rates]
+    RATE --> EUFX[European Commission InforEuro monthly rates]
 ```
 
 A small application container wires dependencies together without an additional

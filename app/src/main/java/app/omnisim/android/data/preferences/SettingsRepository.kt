@@ -16,7 +16,7 @@ private val Context.settingsDataStore by preferencesDataStore(name = "settings")
 
 enum class ThemeMode { System, Light, Dark }
 
-const val CURRENT_LEGAL_CONSENT_VERSION = 1
+const val CURRENT_LEGAL_CONSENT_VERSION = 2
 
 data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.System,

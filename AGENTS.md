@@ -232,8 +232,9 @@ must leave existing data unchanged. Support future format migration via
 
 Core SIM management, renewal history, reminders, and backup behavior must work
 entirely offline. Internet access is limited to fetching public European Central
-Bank reference rates, checking official GitHub releases, and user-initiated
-external renewal or update links. These requests must never include SIM data,
+Bank daily reference rates, European Commission InforEuro monthly rates, checking
+official GitHub releases, and user-initiated external renewal or update links.
+These requests must never include SIM data,
 phone numbers, prices, renewal dates, or notes. Keep recent valid exchange rates
 cached so Usage remains useful offline. Do not include analytics, crash reporting,
 advertising, telemetry, tracking, or remote logging.

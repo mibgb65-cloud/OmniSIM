@@ -20,9 +20,32 @@ class CurrencyOptionsTest {
     }
 
     @Test
+    fun `official rate codes missing from the runtime are added once`() {
+        val result = currencyOptions(Locale.ENGLISH, setOf("QZZ", "USD"))
+
+        assertEquals(1, result.count { it.code == "USD" })
+        assertEquals(1, result.count { it.code == "QZZ" })
+    }
+
+    @Test
     fun `supported currency validation rejects unknown codes`() {
         assertTrue(isSupportedCurrencyCode("usd"))
         assertFalse(isSupportedCurrencyCode("ABC"))
         assertFalse(isSupportedCurrencyCode("XXX"))
+    }
+
+    @Test
+    fun `official rate codes are accepted even when the runtime does not know them`() {
+        assertTrue(isSupportedCurrencyCode("qzz", setOf("QZZ")))
+    }
+
+    @Test
+    fun `current supplemental official currencies remain available offline`() {
+        val currencies = currencyOptions(Locale.ENGLISH).map(CurrencyOption::code)
+
+        assertTrue(isSupportedCurrencyCode("xcg"))
+        assertTrue(isSupportedCurrencyCode("zig"))
+        assertTrue("XCG" in currencies)
+        assertTrue("ZIG" in currencies)
     }
 }

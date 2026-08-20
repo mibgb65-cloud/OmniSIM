@@ -45,6 +45,7 @@ import app.omnisim.android.data.local.entity.SimEntity
 import app.omnisim.android.data.preferences.AppSettings
 import app.omnisim.android.domain.util.calculateRenewalStatus
 import app.omnisim.android.domain.util.daysUntilRenewal
+import app.omnisim.android.domain.util.RenewalPriceChange
 import app.omnisim.android.domain.util.SupportedReminderOffsets
 import app.omnisim.android.domain.util.effectiveReminderOffsets
 import app.omnisim.android.ui.components.RenewalSheet
@@ -64,6 +65,8 @@ import app.omnisim.android.ui.theme.OmniRowSpacing
 import app.omnisim.android.ui.theme.OmniScreenPadding
 import app.omnisim.android.ui.theme.OmniSectionSpacing
 import java.time.LocalDate
+import java.util.Locale
+import kotlin.math.abs
 
 @Composable
 internal fun SectionTitle(value: String) {
@@ -102,6 +105,36 @@ internal fun simTypeLabel(value: String): String = stringResource(
 
 internal fun formatAmount(value: Double): String =
     if (value % 1.0 == 0.0) value.toLong().toString() else "%.2f".format(value)
+
+@Composable
+internal fun RenewalPriceChangeRow(change: RenewalPriceChange) {
+    val difference = change.latestAmount - change.previousAmount
+    val direction = when {
+        difference == 0.0 -> stringResource(R.string.price_change_unchanged)
+        change.percentageChange == null -> stringResource(R.string.price_change_increased)
+        difference > 0.0 -> stringResource(
+            R.string.price_change_up,
+            formatPricePercentage(change.percentageChange),
+        )
+        else -> stringResource(
+            R.string.price_change_down,
+            formatPricePercentage(change.percentageChange),
+        )
+    }
+    InfoRow(
+        label = stringResource(R.string.recent_renewal_price_change),
+        value = stringResource(
+            R.string.price_change_value,
+            change.currency,
+            formatAmount(change.previousAmount),
+            formatAmount(change.latestAmount),
+            direction,
+        ),
+    )
+}
+
+private fun formatPricePercentage(value: Double): String =
+    String.format(Locale.getDefault(), "%.1f", abs(value))
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

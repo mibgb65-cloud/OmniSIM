@@ -277,7 +277,9 @@ internal fun AppUpdateDialog(
                             stringResource(R.string.whats_new),
                             style = MaterialTheme.typography.titleSmall,
                         )
-                        Text(release.notes ?: stringResource(R.string.no_release_notes))
+                        ReleaseNotesContent(
+                            release.notes ?: stringResource(R.string.no_release_notes),
+                        )
                     }
                 },
                 confirmButton = {
@@ -435,6 +437,7 @@ internal fun SwitchSetting(
     title: String,
     description: String,
     checked: Boolean,
+    enabled: Boolean = true,
     onCheckedChange: (Boolean) -> Unit,
 ) {
     Row(
@@ -442,6 +445,7 @@ internal fun SwitchSetting(
             .fillMaxWidth()
             .toggleable(
                 value = checked,
+                enabled = enabled,
                 role = Role.Switch,
                 onValueChange = onCheckedChange,
             ),
@@ -461,7 +465,7 @@ internal fun SwitchSetting(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Switch(checked = checked, onCheckedChange = null)
+        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
     }
 }
 
