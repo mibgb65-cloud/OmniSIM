@@ -17,6 +17,8 @@ import app.omnisim.android.data.local.entity.SimEntity
 import app.omnisim.android.data.preferences.AppSettings
 import app.omnisim.android.data.preferences.ThemeMode
 import app.omnisim.android.data.update.AppReleaseInfo
+import app.omnisim.android.data.update.AppUpdateDownloadController
+import app.omnisim.android.data.update.AppUpdateDownloadState
 import app.omnisim.android.data.update.compareVersionNames
 import app.omnisim.android.domain.util.isSupportedCurrencyCode
 import app.omnisim.android.domain.util.areReminderOffsetsValid
@@ -174,14 +176,21 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         container.backupManager.hasRecoverySnapshot(),
     )
     private val exchangeRates = MutableStateFlow<ExchangeRateUiState>(ExchangeRateUiState.Idle)
+    private val _appUpdateDownloadState = MutableStateFlow<AppUpdateDownloadState?>(null)
     private val messagesChannel = Channel<UiMessage>(Channel.BUFFERED)
     private val _appUpdateState = MutableStateFlow<AppUpdateUiState>(AppUpdateUiState.Idle)
     private var exchangeRateRefreshJob: Job? = null
     private var appUpdateJob: Job? = null
+    private val updateDownloadController = AppUpdateDownloadController(
+        repository = container.appUpdateRepository,
+        onState = { _appUpdateDownloadState.value = it },
+    )
     private var automaticUpdateCheckStarted = false
     private var showUpdateCheckResult = false
     val messages = messagesChannel.receiveAsFlow()
     val appUpdateState: StateFlow<AppUpdateUiState> = _appUpdateState.asStateFlow()
+    val appUpdateDownloadState: StateFlow<AppUpdateDownloadState?> =
+        _appUpdateDownloadState.asStateFlow()
 
     private val settingsWithConsent = combine(
         container.settingsRepository.settings,
@@ -305,8 +314,19 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     fun dismissUpdateDialog() {
         appUpdateJob?.cancel()
         appUpdateJob = null
+        updateDownloadController.cancel()
+        _appUpdateDownloadState.value = null
         showUpdateCheckResult = false
         _appUpdateState.value = AppUpdateUiState.Idle
+    }
+
+    fun downloadUpdate(release: AppReleaseInfo) {
+        updateDownloadController.download(viewModelScope, release)
+    }
+
+    fun cancelUpdateDownload() {
+        updateDownloadController.cancel()
+        _appUpdateDownloadState.value = null
     }
 
     fun acceptLegalConsent() = launchSettings {

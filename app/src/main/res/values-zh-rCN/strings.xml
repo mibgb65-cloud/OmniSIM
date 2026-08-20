@@ -336,9 +336,9 @@
     <string name="legal_consent_title">欢迎使用 OmniSIM</string>
     <string name="legal_consent_intro">使用前，请阅读并同意以下用户协议与隐私政策。你可以滚动查看完整内容。</string>
     <string name="user_agreement">用户协议</string>
-    <string name="user_agreement_body">1. 服务说明\nOmniSIM 是一款本地优先的 SIM 与 eSIM 续费管理工具，用于记录续费日期、费用和提醒。应用提供的信息与提醒仅供辅助参考，WorkManager 和设备省电策略可能导致提醒延迟，你仍需自行确认运营商规则和实际续费时间。\n\n2. 使用责任\n你应确保录入信息准确，并自行保管导出的备份文件。因错误信息、未及时续费、设备故障、卸载应用或未授予通知权限造成的损失，由你自行承担。\n\n3. 外部服务\n当你查看成本或检查更新时，应用可能访问欧洲中央银行、欧盟委员会与 GitHub 的公开服务；点击续费链接或下载更新时，将由浏览器或系统安装程序处理。外部服务受其各自条款约束。\n\n4. 软件许可与可用性\nOmniSIM 以 MIT 许可证开源，并按现状提供。在法律允许的范围内，不对服务持续可用、提醒绝对准时或数据永久保存作保证。建议在清除数据、卸载或更换设备前导出备份。\n\n5. 协议更新\n如果本协议或隐私政策发生实质变化，应用会再次征求你的同意。继续使用前需接受更新后的内容。</string>
+    <string name="user_agreement_body">1. 服务说明\nOmniSIM 是一款本地优先的 SIM 与 eSIM 续费管理工具，用于记录续费日期、费用和提醒。应用提供的信息与提醒仅供辅助参考，WorkManager 和设备省电策略可能导致提醒延迟，你仍需自行确认运营商规则和实际续费时间。\n\n2. 使用责任\n你应确保录入信息准确，并自行保管导出的备份文件。因错误信息、未及时续费、设备故障、卸载应用或未授予通知权限造成的损失，由你自行承担。\n\n3. 外部服务\n当你查看成本或检查更新时，应用可能访问欧洲中央银行、欧盟委员会与 GitHub 的公开服务；续费链接交给浏览器打开，确认后由 OmniSIM 下载更新 APK，再交给 Android 系统安装程序。外部服务受其各自条款约束。\n\n4. 软件许可与可用性\nOmniSIM 以 MIT 许可证开源，并按现状提供。在法律允许的范围内，不对服务持续可用、提醒绝对准时或数据永久保存作保证。建议在清除数据、卸载或更换设备前导出备份。\n\n5. 协议更新\n如果本协议或隐私政策发生实质变化，应用会再次征求你的同意。继续使用前需接受更新后的内容。</string>
     <string name="privacy_policy">隐私政策</string>
-    <string name="privacy_policy_body">1. 本地数据\nSIM 信息、手机号码、续费日期、费用、备注、历史记录和设置保存在设备上的应用私有存储中。OmniSIM 不要求注册账户，也不会把这些 SIM 数据上传到远程服务器。\n\n2. 网络访问\n应用仅为获取欧洲中央银行与欧盟委员会的公开汇率，以及在冷启动或手动操作时从 GitHub 检查 OmniSIM 正式版本而联网。请求不包含 SIM 记录、手机号码、费用、日期或备注；相关网络服务仍可能获得 IP 地址等标准连接信息。\n\n3. 权限与通知\n通知权限仅用于续费提醒，Android 13 及以上版本会单独请求系统授权。应用不会申请通讯录、短信、电话、通话记录、位置、相机、麦克风或广泛存储权限。\n\n4. 文件与外部链接\n备份和恢复通过 Android 文件选择器完成，应用只能访问你主动选择的文件。备份含有你录入的数据，请妥善保管。续费网站和更新下载由外部浏览器打开，应用不会把已存储的 SIM 数据附加到链接。\n\n5. 数据删除\n删除 SIM 时，其续费历史也会删除。卸载 OmniSIM 会移除应用私有存储中的数据；此前导出的备份仍保留在你选择的位置。\n\n6. 数据收集\nOmniSIM 不包含广告、分析、遥测、远程日志或用户追踪功能。</string>
+    <string name="privacy_policy_body">1. 本地数据\nSIM 信息、手机号码、续费日期、费用、备注、历史记录和设置保存在设备上的应用私有存储中。OmniSIM 不要求注册账户，也不会把这些 SIM 数据上传到远程服务器。\n\n2. 网络访问\n应用仅为获取欧洲中央银行与欧盟委员会的公开汇率，从 GitHub 检查 OmniSIM 正式版本，并在用户确认后下载正式 APK 和校验文件而联网。请求不包含 SIM 记录、手机号码、费用、日期或备注；相关网络服务仍可能获得 IP 地址等标准连接信息。\n\n3. 权限与通知\n通知权限仅用于续费提醒，Android 13 及以上版本会单独请求系统授权。安装应用权限只在你确认正式更新后使用，Android 仍会显示自己的安装确认或来源授权页面。应用不会申请通讯录、短信、电话、通话记录、位置、相机、麦克风或广泛存储权限。\n\n4. 文件与外部链接\n备份和恢复通过 Android 文件选择器完成，应用只能访问你主动选择的文件。备份含有你录入的数据，请妥善保管。续费网站交给外部浏览器打开；官方更新 APK 下载到应用私有缓存，并通过 SHA-256 校验后交给 Android 安装程序。应用不会把已存储的 SIM 数据附加到任何网址。\n\n5. 数据删除\n删除 SIM 时，其续费历史也会删除。卸载 OmniSIM 会移除应用私有存储中的数据；此前导出的备份仍保留在你选择的位置。\n\n6. 数据收集\nOmniSIM 不包含广告、分析、遥测、远程日志或用户追踪功能。</string>
     <string name="action_agree_and_continue">同意并继续</string>
     <string name="action_disagree_and_exit">不同意并退出</string>
     <string name="usage_guide">使用说明</string>
@@ -357,6 +357,13 @@
     <string name="whats_new">更新内容</string>
     <string name="no_release_notes">此版本没有提供更新说明。</string>
     <string name="download_update">下载更新</string>
+    <string name="update_download_started">正在下载并校验官方 APK…</string>
+    <string name="update_download_progress">正在下载… %1$d%%</string>
+    <string name="update_download_ready">下载和校验已完成，可以交给 Android 安装。</string>
+    <string name="update_download_failed">下载、SHA-256 或签名校验失败，未安装任何 APK。</string>
+    <string name="retry_download_update">重试下载</string>
+    <string name="cancel_download_update">取消下载</string>
+    <string name="install_update">安装更新</string>
     <string name="update_checksum_available">此正式版本同时提供匹配的 SHA-256 校验文件。</string>
     <string name="open_source_license">本项目基于 MIT 许可证开源。</string>
     <string name="background_limitation">提醒时间为近似值，Android 及厂商的省电策略可能延迟后台任务。</string>
@@ -370,9 +377,9 @@
     <string name="permission_status_not_required">无需授权</string>
     <string name="open_system_permissions">打开系统权限设置</string>
     <string name="privacy_network_title">网络访问</string>
-    <string name="privacy_network_body">网络用于下载欧洲中央银行公开的每日汇率、欧盟委员会公开的月度汇率，并从 GitHub 获取 OmniSIM 正式版本信息。这些请求不包含 SIM 记录、手机号码、价格或日期；相关服务仍可看到 IP 地址等标准网络信息。</string>
+    <string name="privacy_network_body">网络用于下载欧洲中央银行公开的每日汇率、欧盟委员会公开的月度汇率，从 GitHub 获取 OmniSIM 正式版本信息，以及在用户确认后下载正式 APK 和校验文件。这些请求不包含 SIM 记录、手机号码、价格或日期；相关服务仍可看到 IP 地址等标准网络信息。</string>
     <string name="privacy_files_title">备份、恢复与外部网站</string>
-    <string name="privacy_files_body">备份和恢复使用 Android 文件选择器，OmniSIM 只能访问你主动选择的文件，也不会申请广泛存储权限。导出的备份包含 SIM 数据，请妥善保管。续费链接和更新下载会交给浏览器打开，OmniSIM 不会把已存储的 SIM 数据附加到网址中。</string>
+    <string name="privacy_files_body">备份和恢复使用 Android 文件选择器，OmniSIM 只能访问你主动选择的文件，也不会申请广泛存储权限。导出的备份包含 SIM 数据，请妥善保管。续费网站交给浏览器打开；官方更新 APK 下载到应用私有缓存，并通过 SHA-256 校验后交给 Android 安装程序。OmniSIM 不会把已存储的 SIM 数据附加到任何网址中。</string>
     <string name="privacy_unused_permissions_title">OmniSIM 不使用的权限</string>
     <string name="privacy_unused_permissions_body">OmniSIM 不会申请通讯录、短信、电话、通话记录、位置、相机、麦克风或广泛存储权限。</string>
     <string name="privacy_deletion_title">删除数据</string>

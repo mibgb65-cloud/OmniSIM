@@ -125,4 +125,32 @@ class AppUpdateRepositoryTest {
         assertEquals(false, isTrustedUpdateDownloadUrl("http://github.com/example.apk"))
         assertEquals(false, isTrustedUpdateDownloadUrl("https://example.com/OmniSIM.apk"))
     }
+
+    @Test
+    fun parseSha256Checksum_acceptsGitHubChecksumFile() {
+        assertEquals(
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            parseSha256Checksum(
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef  OmniSIM-1.3.0-release.apk",
+                "OmniSIM-1.3.0-release.apk",
+            ),
+        )
+    }
+
+    @Test
+    fun parseSha256Checksum_rejectsWrongFileName() {
+        assertThrows(IllegalArgumentException::class.java) {
+            parseSha256Checksum(
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef  other.apk",
+                "OmniSIM-1.3.0-release.apk",
+            )
+        }
+    }
+
+    @Test
+    fun parseSha256Checksum_rejectsInvalidHash() {
+        assertThrows(IllegalArgumentException::class.java) {
+            parseSha256Checksum("not-a-checksum", "OmniSIM-1.3.0-release.apk")
+        }
+    }
 }

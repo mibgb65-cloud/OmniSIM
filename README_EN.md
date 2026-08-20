@@ -74,7 +74,7 @@ Core SIM management, renewal history, reminders, and backup work offline.
 | Topic | Behavior |
 | --- | --- |
 | Local data | Phone numbers, SIM details, dates, prices, and notes remain on the device |
-| Network access | Used for public ECB and European Commission rates plus GitHub release metadata, or for renewal and update downloads opened by the user |
+| Network access | Used for public ECB and European Commission rates plus GitHub release metadata; confirmed official APKs are downloaded and verified in-app |
 | Rate requests | Never include SIM data, phone numbers, prices, or renewal dates; cached rates provide fallback |
 | Data collection | No analytics, telemetry, advertising, crash reporting, or remote logging |
 | Accounts and cloud | No accounts, login, cloud sync, or backend service |
@@ -84,10 +84,12 @@ The app declares only the permissions it needs:
 | Permission | Purpose |
 | --- | --- |
 | `POST_NOTIFICATIONS` | Renewal notifications on Android 13+, requested only after the user enables reminders |
-| `INTERNET` | Download public European Central Bank and European Commission exchange-rate data and check official GitHub releases |
+| `INTERNET` | Fetch public rates, check GitHub releases, and download confirmed APK/checksum assets |
+| `REQUEST_INSTALL_PACKAGES` | Hand a verified official APK to Android’s installer; installation still requires user confirmation |
 
-Renewal URLs and confirmed update downloads are handed to an external browser;
-version comparison and release notes stay inside the app.
+Renewal URLs are handed to an external browser; confirmed official APKs are downloaded
+and verified in-app, then handed to Android’s installer. Version comparison and release
+notes stay inside the app.
 
 OmniSIM does not request contacts, SMS, phone, call-log, location, camera,
 microphone, or broad storage access.

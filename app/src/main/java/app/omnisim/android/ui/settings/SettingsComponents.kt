@@ -36,6 +36,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -67,6 +68,8 @@ import app.omnisim.android.R
 import app.omnisim.android.backup.BackupPayload
 import app.omnisim.android.data.preferences.AppSettings
 import app.omnisim.android.data.preferences.ThemeMode
+import app.omnisim.android.data.update.AppReleaseInfo
+import app.omnisim.android.data.update.AppUpdateDownloadState
 import app.omnisim.android.notification.NotificationAvailability
 import app.omnisim.android.notification.NotificationHelper
 import app.omnisim.android.ui.components.OmniDialogSystemBars
@@ -81,6 +84,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import java.io.File
 
 enum class SettingsSection {
     Overview,
@@ -181,8 +185,11 @@ private fun NotificationStatusLine(
 @Composable
 internal fun AppUpdateDialog(
     state: AppUpdateUiState,
+    downloadState: AppUpdateDownloadState?,
     onRetry: () -> Unit,
-    onDownload: (String) -> Unit,
+    onDownload: (AppReleaseInfo) -> Unit,
+    onCancelDownload: () -> Unit,
+    onInstall: (File) -> Unit,
     onDismiss: () -> Unit,
 ) {
     when (state) {
@@ -280,21 +287,76 @@ internal fun AppUpdateDialog(
                         ReleaseNotesContent(
                             release.notes ?: stringResource(R.string.no_release_notes),
                         )
+                        when (val download = downloadState) {
+                            is AppUpdateDownloadState.Downloading -> {
+                                Spacer(Modifier.height(4.dp))
+                                if (download.progressPercent == null) {
+                                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                                } else {
+                                    LinearProgressIndicator(
+                                        progress = { download.progressPercent / 100f },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                }
+                                Text(
+                                    download.progressPercent?.let {
+                                        stringResource(R.string.update_download_progress, it)
+                                    } ?: stringResource(R.string.update_download_started),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            is AppUpdateDownloadState.Ready -> Text(
+                                stringResource(R.string.update_download_ready),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            is AppUpdateDownloadState.Failed -> Text(
+                                stringResource(R.string.update_download_failed),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            null -> Unit
+                        }
                     }
                 },
                 confirmButton = {
-                    Button(
-                        onClick = {
-                            onDownload(release.apkDownloadUrl)
-                            onDismiss()
-                        },
-                    ) {
-                        Text(stringResource(R.string.download_update))
+                    when (val download = downloadState) {
+                        is AppUpdateDownloadState.Downloading -> Unit
+                        is AppUpdateDownloadState.Ready -> Button(
+                            onClick = { onInstall(download.apkFile) },
+                        ) {
+                            Text(stringResource(R.string.install_update))
+                        }
+                        is AppUpdateDownloadState.Failed -> Button(
+                            onClick = { onDownload(release) },
+                        ) {
+                            Text(stringResource(R.string.retry_download_update))
+                        }
+                        null -> Button(
+                            onClick = { onDownload(release) },
+                        ) {
+                            Text(stringResource(R.string.download_update))
+                        }
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = onDismiss) {
-                        Text(stringResource(R.string.action_cancel))
+                    TextButton(
+                        onClick = if (downloadState is AppUpdateDownloadState.Downloading) {
+                            onCancelDownload
+                        } else {
+                            onDismiss
+                        },
+                    ) {
+                        Text(
+                            stringResource(
+                                if (downloadState is AppUpdateDownloadState.Downloading) {
+                                    R.string.cancel_download_update
+                                } else {
+                                    R.string.action_cancel
+                                },
+                            ),
+                        )
                     }
                 },
             )

@@ -1,9 +1,15 @@
 package app.omnisim.android.data.update
 
 import java.io.IOException
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileOutputStream
+import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
+import java.security.MessageDigest
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
@@ -51,8 +57,171 @@ class GitHubAppUpdateSource(
 
 class AppUpdateRepository(
     private val source: AppUpdateSource = GitHubAppUpdateSource(),
+    private val cacheDirectory: File = File(
+        System.getProperty("java.io.tmpdir") ?: ".",
+        "omnisim-updates",
+    ),
+    private val apkVerifier: (File) -> Boolean = { true },
 ) {
     suspend fun getLatestRelease(): AppReleaseInfo = source.fetchLatestRelease()
+
+    suspend fun downloadAndVerify(
+        release: AppReleaseInfo,
+        onProgress: (downloadedBytes: Long, totalBytes: Long?) -> Unit,
+    ): File = withContext(Dispatchers.IO) {
+        require(isTrustedUpdateDownloadUrl(release.apkDownloadUrl)) {
+            "Release APK URL is invalid"
+        }
+        require(isTrustedChecksumDownloadUrl(release.checksumDownloadUrl)) {
+            "Release checksum URL is invalid"
+        }
+        val expectedApkName = "OmniSIM-" + release.version + "-release.apk"
+        require(URI(release.apkDownloadUrl).path.substringAfterLast('/') == expectedApkName) {
+            "Release version does not match the APK name"
+        }
+        require(
+            URI(release.checksumDownloadUrl).path.substringAfterLast('/') ==
+                expectedApkName + ".sha256",
+        ) {
+            "Release version does not match the checksum name"
+        }
+        require(cacheDirectory.isDirectory || cacheDirectory.mkdirs()) {
+            "Update cache directory is unavailable"
+        }
+        val target = File(cacheDirectory, expectedApkName)
+        val partial = File(cacheDirectory, target.name + ".part")
+        try {
+            val checksum = parseSha256Checksum(
+                fetchDownloadText(release.checksumDownloadUrl),
+                target.name,
+            )
+            downloadApk(release.apkDownloadUrl, partial, onProgress)
+            require(sha256Hex(partial) == checksum) {
+                "Downloaded APK checksum does not match the official checksum"
+            }
+            require(apkVerifier(partial)) {
+                "Downloaded APK package or signature is invalid"
+            }
+            if (target.exists()) target.delete()
+            require(partial.renameTo(target)) { "Downloaded APK could not be finalized" }
+            target
+        } catch (error: Throwable) {
+            partial.delete()
+            throw error
+        }
+    }
+}
+
+private const val MAX_UPDATE_APK_BYTES = 100L * 1024L * 1024L
+
+private fun fetchDownloadText(url: String): String {
+    val connection = openDownloadConnection(url)
+    try {
+        val responseCode = connection.responseCode
+        if (responseCode !in 200..299) {
+            throw IOException("Update download failed: HTTP " + responseCode)
+        }
+        return connection.inputStream.use { readLimitedText(it, 4 * 1024) }
+    } finally {
+        connection.disconnect()
+    }
+}
+
+private fun readLimitedText(input: InputStream, maxBytes: Int): String {
+    val output = ByteArrayOutputStream()
+    val buffer = ByteArray(512)
+    while (true) {
+        val count = input.read(buffer)
+        if (count < 0) break
+        require(output.size() + count <= maxBytes) { "Checksum response is too large" }
+        output.write(buffer, 0, count)
+    }
+    return output.toString(Charsets.UTF_8.name())
+}
+
+private fun downloadApk(
+    url: String,
+    destination: File,
+    onProgress: (downloadedBytes: Long, totalBytes: Long?) -> Unit,
+) {
+    val connection = openDownloadConnection(url)
+    try {
+        val responseCode = connection.responseCode
+        if (responseCode !in 200..299) {
+            throw IOException("Update APK download failed: HTTP " + responseCode)
+        }
+        val contentLength = connection.contentLength.toLong().takeIf { it >= 0L }
+        require(contentLength == null || contentLength <= MAX_UPDATE_APK_BYTES) {
+            "Update APK is unexpectedly large"
+        }
+        var downloaded = 0L
+        var lastReported = -1L
+        onProgress(0L, contentLength)
+        connection.inputStream.use { input ->
+            FileOutputStream(destination).use { output ->
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    downloaded += count
+                    require(downloaded <= MAX_UPDATE_APK_BYTES) {
+                        "Update APK is unexpectedly large"
+                    }
+                    output.write(buffer, 0, count)
+                    if (downloaded - lastReported >= 64L * 1024L) {
+                        onProgress(downloaded, contentLength)
+                        lastReported = downloaded
+                    }
+                }
+            }
+        }
+        onProgress(downloaded, contentLength ?: downloaded)
+    } finally {
+        connection.disconnect()
+    }
+}
+
+private fun openDownloadConnection(url: String): HttpURLConnection =
+    (URL(url).openConnection() as HttpURLConnection).apply {
+        requestMethod = "GET"
+        connectTimeout = 15_000
+        readTimeout = 30_000
+        setRequestProperty("Accept", "application/octet-stream,text/plain")
+        setRequestProperty("User-Agent", "OmniSIM-Android")
+    }
+
+internal fun parseSha256Checksum(response: String, expectedFileName: String): String {
+    val tokens = response.lineSequence()
+        .map { it.trim() }
+        .filter(String::isNotEmpty)
+        .firstOrNull()
+        ?.split(Regex("""\s+"""))
+        ?: throw IllegalArgumentException("Checksum response is empty")
+    val checksum = tokens.firstOrNull()?.lowercase(Locale.ROOT)
+        ?: throw IllegalArgumentException("Checksum response is invalid")
+    require(checksum.length == 64 && checksum.all { it in "0123456789abcdef" }) {
+        "Checksum response is invalid"
+    }
+    val fileName = tokens.getOrNull(1)?.removePrefix("*")
+    require(fileName == null || fileName == expectedFileName) {
+        "Checksum response names a different APK"
+    }
+    return checksum
+}
+
+private fun sha256Hex(file: File): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    file.inputStream().use { input ->
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            digest.update(buffer, 0, count)
+        }
+    }
+    return digest.digest().joinToString("") { byte ->
+        "%02x".format(Locale.ROOT, byte.toInt() and 0xff)
+    }
 }
 
 @Serializable

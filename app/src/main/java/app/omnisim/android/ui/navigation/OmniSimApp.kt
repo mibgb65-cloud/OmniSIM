@@ -91,7 +91,7 @@ import app.omnisim.android.BuildConfig
 import app.omnisim.android.backup.isSafeWebUrl
 import app.omnisim.android.R
 import app.omnisim.android.data.preferences.CURRENT_LEGAL_CONSENT_VERSION
-import app.omnisim.android.data.update.isTrustedUpdateDownloadUrl
+import app.omnisim.android.data.update.launchUpdateInstaller
 import app.omnisim.android.ui.AppViewModel
 import app.omnisim.android.ui.appUpdateStateForRoute
 import app.omnisim.android.ui.components.OmniCircleIconButton
@@ -132,6 +132,7 @@ fun OmniSimApp(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val appUpdateState by viewModel.appUpdateState.collectAsStateWithLifecycle()
+    val appUpdateDownloadState by viewModel.appUpdateDownloadState.collectAsStateWithLifecycle()
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val route = backStackEntry?.destination?.route ?: Routes.Home
@@ -579,14 +580,13 @@ fun OmniSimApp(
                 )
             }
         }
-
         if (hasLegalConsent && state.pendingRestore == null) {
             AppUpdateDialog(
                 state = appUpdateStateForRoute(appUpdateState, route == Routes.Home),
+                downloadState = appUpdateDownloadState,
                 onRetry = { viewModel.checkForUpdates(BuildConfig.VERSION_NAME) },
-                onDownload = { url ->
-                    if (isTrustedUpdateDownloadUrl(url)) uriHandler.openUri(url)
-                },
+                onDownload = viewModel::downloadUpdate, onCancelDownload = viewModel::cancelUpdateDownload,
+                onInstall = { apkFile -> if (launchUpdateInstaller(context, apkFile)) viewModel.dismissUpdateDialog() },
                 onDismiss = viewModel::dismissUpdateDialog,
             )
         }
