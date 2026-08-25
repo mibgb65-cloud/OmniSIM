@@ -16,6 +16,8 @@ private val Context.settingsDataStore by preferencesDataStore(name = "settings")
 
 enum class ThemeMode { System, Light, Dark }
 
+enum class ReminderCheckResult { NotRun, Success, NotificationsBlocked, Failed }
+
 const val CURRENT_LEGAL_CONSENT_VERSION = 3
 
 data class AppSettings(
@@ -26,7 +28,11 @@ data class AppSettings(
     val reminderOffsets: Set<Int> = setOf(30, 14, 7, 3, 1, 0, -1),
     val defaultCurrency: String = "USD",
     val lastReminderCheckAt: Instant? = null,
+    val lastReminderCheckResult: ReminderCheckResult = ReminderCheckResult.NotRun,
+    val lastReminderCheckScannedCount: Int = 0,
+    val lastReminderCheckSentCount: Int = 0,
     val lastBackupAt: Instant? = null,
+    val backupDirty: Boolean = false,
 )
 
 class SettingsRepository(private val context: Context) {
@@ -39,7 +45,11 @@ class SettingsRepository(private val context: Context) {
         val defaultCurrency = stringPreferencesKey("default_currency")
         val legalConsentVersion = intPreferencesKey("legal_consent_version")
         val lastReminderCheckAt = longPreferencesKey("last_reminder_check_at")
+        val lastReminderCheckResult = stringPreferencesKey("last_reminder_check_result")
+        val lastReminderCheckScannedCount = intPreferencesKey("last_reminder_check_scanned_count")
+        val lastReminderCheckSentCount = intPreferencesKey("last_reminder_check_sent_count")
         val lastBackupAt = longPreferencesKey("last_backup_at")
+        val backupDirty = booleanPreferencesKey("backup_dirty")
     }
 
     val settings: Flow<AppSettings> = context.settingsDataStore.data.map(::toSettings)
@@ -47,22 +57,42 @@ class SettingsRepository(private val context: Context) {
         preferences[Keys.legalConsentVersion] ?: 0
     }
 
-    suspend fun setThemeMode(value: ThemeMode) = update(Keys.theme, value.name)
-    suspend fun setDynamicColor(value: Boolean) = update(Keys.dynamicColor, value)
-    suspend fun setWarningPeriod(value: Int) = update(Keys.warningPeriod, value.coerceAtLeast(0))
-    suspend fun setMaskPhoneNumbers(value: Boolean) = update(Keys.maskPhoneNumbers, value)
-    suspend fun setDefaultCurrency(value: String) = update(Keys.defaultCurrency, value.uppercase())
+    suspend fun setThemeMode(value: ThemeMode) = updateBackedSetting(Keys.theme, value.name)
+    suspend fun setDynamicColor(value: Boolean) = updateBackedSetting(Keys.dynamicColor, value)
+    suspend fun setWarningPeriod(value: Int) =
+        updateBackedSetting(Keys.warningPeriod, value.coerceAtLeast(0))
+    suspend fun setMaskPhoneNumbers(value: Boolean) =
+        updateBackedSetting(Keys.maskPhoneNumbers, value)
+    suspend fun setDefaultCurrency(value: String) =
+        updateBackedSetting(Keys.defaultCurrency, value.uppercase())
     suspend fun acceptCurrentLegalConsent() =
         update(Keys.legalConsentVersion, CURRENT_LEGAL_CONSENT_VERSION)
 
-    suspend fun recordReminderCheck(value: Instant) =
-        update(Keys.lastReminderCheckAt, value.toEpochMilli())
+    suspend fun recordReminderCheck(
+        value: Instant,
+        result: ReminderCheckResult,
+        scannedCount: Int,
+        sentCount: Int,
+    ) {
+        context.settingsDataStore.edit { preferences ->
+            preferences[Keys.lastReminderCheckAt] = value.toEpochMilli()
+            preferences[Keys.lastReminderCheckResult] = result.name
+            preferences[Keys.lastReminderCheckScannedCount] = scannedCount
+            preferences[Keys.lastReminderCheckSentCount] = sentCount
+        }
+    }
 
-    suspend fun recordBackup(value: Instant) =
-        update(Keys.lastBackupAt, value.toEpochMilli())
+    suspend fun recordBackup(value: Instant) {
+        context.settingsDataStore.edit { preferences ->
+            preferences[Keys.lastBackupAt] = value.toEpochMilli()
+            preferences[Keys.backupDirty] = false
+        }
+    }
+
+    suspend fun markBackupDirty() = update(Keys.backupDirty, true)
 
     suspend fun setReminderOffsets(value: Set<Int>) =
-        update(Keys.reminderOffsets, value.sortedDescending().joinToString(","))
+        updateBackedSetting(Keys.reminderOffsets, value.sortedDescending().joinToString(","))
 
     suspend fun replace(settings: AppSettings) {
         context.settingsDataStore.edit { preferences ->
@@ -77,6 +107,13 @@ class SettingsRepository(private val context: Context) {
 
     private suspend fun <T> update(key: Preferences.Key<T>, value: T) {
         context.settingsDataStore.edit { it[key] = value }
+    }
+
+    private suspend fun <T> updateBackedSetting(key: Preferences.Key<T>, value: T) {
+        context.settingsDataStore.edit { preferences ->
+            preferences[key] = value
+            preferences[Keys.backupDirty] = true
+        }
     }
 
     private fun toSettings(preferences: Preferences): AppSettings {
@@ -95,7 +132,13 @@ class SettingsRepository(private val context: Context) {
                 ?: default.reminderOffsets,
             defaultCurrency = preferences[Keys.defaultCurrency] ?: default.defaultCurrency,
             lastReminderCheckAt = preferences[Keys.lastReminderCheckAt]?.let(Instant::ofEpochMilli),
+            lastReminderCheckResult = preferences[Keys.lastReminderCheckResult]
+                ?.let { runCatching { ReminderCheckResult.valueOf(it) }.getOrNull() }
+                ?: default.lastReminderCheckResult,
+            lastReminderCheckScannedCount = preferences[Keys.lastReminderCheckScannedCount] ?: 0,
+            lastReminderCheckSentCount = preferences[Keys.lastReminderCheckSentCount] ?: 0,
             lastBackupAt = preferences[Keys.lastBackupAt]?.let(Instant::ofEpochMilli),
+            backupDirty = preferences[Keys.backupDirty] ?: false,
         )
     }
 }

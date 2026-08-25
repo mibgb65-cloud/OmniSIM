@@ -19,6 +19,9 @@
     <string name="nothing_needs_attention">暂无需要处理</string>
     <string name="renewals_up_to_date">所有 SIM 的续费状态都正常。</string>
     <string name="upcoming">后续续费</string>
+    <string name="needs_attention">需要处理</string>
+    <string name="no_upcoming_renewals">暂无后续续费</string>
+    <string name="no_upcoming_renewals_description">需要时可添加其他 SIM，或更新续费日期。</string>
     <string name="no_sims_yet">还没有 SIM</string>
     <string name="no_sims_description">添加第一张 SIM 或 eSIM，开始记录续费日期。</string>
     <string name="mark_as_renewed">标记为已续费</string>
@@ -51,6 +54,7 @@
     <string name="error_non_negative_amount">请输入不小于 0 的金额</string>
     <string name="action_ok">确定</string>
     <string name="action_cancel">取消</string>
+    <string name="action_not_now">暂不</string>
     <string name="action_retry">重试</string>
 
     <string name="search_sims">搜索 SIM</string>
@@ -290,6 +294,11 @@
     <string name="notification_delivery_status">通知投递</string>
     <string name="notification_background_status">后台任务</string>
     <string name="notification_background_not_run">尚未检查</string>
+    <string name="notification_background_success">%1$s · 扫描 %2$d 张 · 已发送 %3$d 条</string>
+    <string name="notification_background_stale">上次检查于 %1$s，后台运行可能受限</string>
+    <string name="notification_background_blocked">%1$s · 通知投递被阻止</string>
+    <string name="notification_background_failed">%1$s · 检查失败，将自动重试</string>
+    <string name="notification_background_previous">上次检查于 %1$s · 下次检查后显示详细结果</string>
     <string name="notification_status_ready">可以正常通知</string>
     <string name="notification_status_needs_attention">通知需要设置</string>
     <string name="notification_status_permission_required">需要通知权限</string>
@@ -297,6 +306,7 @@
     <string name="notification_status_channel_disabled">续费提醒通道已关闭</string>
     <string name="send_test_notification">发送测试</string>
     <string name="open_notification_settings">Android 设置</string>
+    <string name="open_background_settings">后台运行设置</string>
     <string name="test_notification_title">OmniSIM 通知已就绪</string>
     <string name="test_notification_body">测试成功，此设备可以显示续费提醒。</string>
     <string name="message_test_notification_sent">测试通知已发送</string>
@@ -320,6 +330,7 @@
     <string name="settings_data">数据</string>
     <string name="backup_status">备份状态</string>
     <string name="last_backup_time">上次导出：%1$s</string>
+    <string name="backup_changes_pending">有尚未导出的数据更改</string>
     <string name="no_backup_created">此设备尚未导出过备份。</string>
     <string name="backup_recommended">建议定期备份，并在清除数据、卸载或更换设备前导出。</string>
     <string name="export_backup">导出备份</string>

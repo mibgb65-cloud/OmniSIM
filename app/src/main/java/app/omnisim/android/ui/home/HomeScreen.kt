@@ -134,6 +134,12 @@ fun HomeScreen(
     val statusBarPadding = WindowInsets.statusBars
         .asPaddingValues()
         .calculateTopPadding()
+    val density = LocalDensity.current
+    val screenHeight = with(density) {
+        LocalWindowInfo.current.containerSize.height.toDp()
+    }
+    val useCompactHero = screenHeight < 480.dp
+    val reserveBottomBarSpace = useCompactHero || density.fontScale > 1f
     val active = remember(sims) {
         sims.filterNot(SimEntity::archived).sortedBy(SimEntity::nextRenewalDate)
     }
@@ -145,7 +151,18 @@ fun HomeScreen(
         EmptyHome(onAdd)
     } else {
         val nextSim = active.find { it.id == selectedSimId } ?: active.first()
-        val otherSims = active.filterNot { it.id == nextSim.id }
+        val attention = active.filter { sim ->
+            calculateRenewalStatus(
+                today,
+                sim.nextRenewalDate,
+                settings.warningPeriodDays,
+                archived = false,
+            ) != RenewalStatus.Active
+        }
+        val attentionAfterHero = attention.filterNot { it.id == nextSim.id }
+        val attentionIds = attention.mapTo(mutableSetOf(), SimEntity::id)
+        val heroNeedsAttention = nextSim.id in attentionIds
+        val upcoming = active.filter { it.id != nextSim.id && it.id !in attentionIds }
         val listState = rememberLazyListState()
 
         LaunchedEffect(nextSim.id) {
@@ -153,13 +170,24 @@ fun HomeScreen(
         }
 
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .then(
+                    if (reserveBottomBarSpace) {
+                        Modifier.padding(bottom = bottomContentPadding)
+                    } else {
+                        Modifier
+                    },
+                ),
             state = listState,
             contentPadding = PaddingValues(
                 top = statusBarPadding,
-                bottom = bottomContentPadding + 24.dp,
+                bottom = if (reserveBottomBarSpace) 24.dp else bottomContentPadding + 24.dp,
             ),
         ) {
+            if (heroNeedsAttention) item(key = "attention-header") {
+                AttentionSectionHeader(attention.size, compact = useCompactHero)
+            }
             item(key = "renewal-hero") {
                 RenewalHero(
                     sim = nextSim,
@@ -168,9 +196,23 @@ fun HomeScreen(
                     onSelect = { showSimPicker = true },
                     onOpen = { onOpenSim(nextSim.id) },
                     onRenew = { renewalSim = nextSim },
+                    compact = useCompactHero,
                 )
             }
-            item {
+            if (!heroNeedsAttention && attentionAfterHero.isNotEmpty()) item(key = "attention-header") {
+                AttentionSectionHeader(attentionAfterHero.size, compact = useCompactHero)
+            }
+            items(attentionAfterHero, key = { "attention-${it.id}" }) { sim ->
+                AttentionRenewalCard(
+                    sim = sim,
+                    settings = settings,
+                    today = today,
+                    onOpen = { onOpenSim(sim.id) },
+                    onRenew = { renewalSim = sim },
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+                )
+            }
+            item(key = "upcoming-header") {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -180,13 +222,13 @@ fun HomeScreen(
                 ) {
                     OmniSectionHeader(text = stringResource(R.string.upcoming))
                     Text(
-                        otherSims.size.toString(),
+                        upcoming.size.toString(),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
-            if (otherSims.isEmpty()) {
+            if (upcoming.isEmpty()) {
                 item {
                     Surface(
                         modifier = Modifier.padding(horizontal = 20.dp),
@@ -195,12 +237,12 @@ fun HomeScreen(
                     ) {
                         Column(Modifier.padding(20.dp)) {
                             Text(
-                                stringResource(R.string.nothing_needs_attention),
+                                stringResource(R.string.no_upcoming_renewals),
                                 style = MaterialTheme.typography.titleMedium,
                             )
                             Spacer(Modifier.height(4.dp))
                             Text(
-                                stringResource(R.string.renewals_up_to_date),
+                                stringResource(R.string.no_upcoming_renewals_description),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -209,7 +251,7 @@ fun HomeScreen(
                 }
             } else {
                 itemsIndexed(
-                    items = otherSims,
+                    items = upcoming,
                     key = { _, sim -> "upcoming-${sim.id}" },
                 ) { index, sim ->
                     UpcomingTimelineItem(
@@ -217,7 +259,7 @@ fun HomeScreen(
                         settings = settings,
                         today = today,
                         isFirst = index == 0,
-                        isLast = index == otherSims.lastIndex,
+                        isLast = index == upcoming.lastIndex,
                         onClick = { onOpenSim(sim.id) },
                     )
                 }
@@ -263,6 +305,29 @@ fun HomeScreen(
                 onRenew(sim, actual, next, amount, notes)
                 renewalSim = null
             },
+        )
+    }
+}
+
+@Composable
+private fun AttentionSectionHeader(count: Int, compact: Boolean) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                start = 20.dp,
+                top = if (compact) 4.dp else 24.dp,
+                end = 20.dp,
+                bottom = if (compact) 4.dp else 14.dp,
+            ),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        OmniSectionHeader(text = stringResource(R.string.needs_attention))
+        Text(
+            count.toString(),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

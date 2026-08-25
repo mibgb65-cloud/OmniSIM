@@ -121,6 +121,7 @@ internal fun RenewalHero(
     onSelect: () -> Unit,
     onOpen: () -> Unit,
     onRenew: () -> Unit,
+    compact: Boolean = false,
 ) {
     val status = calculateRenewalStatus(
         today,
@@ -134,14 +135,19 @@ internal fun RenewalHero(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 20.dp, top = 14.dp, end = 20.dp, bottom = 28.dp),
+            .padding(
+                start = 20.dp,
+                top = if (compact) 4.dp else 14.dp,
+                end = 20.dp,
+                bottom = if (compact) 8.dp else 28.dp,
+            ),
     ) {
         Surface(
             onClick = onSelect,
             modifier = Modifier
                 .align(Alignment.CenterHorizontally)
                 .widthIn(max = 300.dp)
-                .height(56.dp),
+                .height(if (compact) 48.dp else 56.dp),
             color = MaterialTheme.colorScheme.secondaryContainer,
             contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
             shape = CircleShape,
@@ -151,7 +157,7 @@ internal fun RenewalHero(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                SimCountryAvatar(sim, Modifier.size(36.dp))
+                SimCountryAvatar(sim, Modifier.size(if (compact) 32.dp else 36.dp))
                 Column(Modifier.widthIn(max = 190.dp)) {
                     Text(
                         "${sim.name} · ${status.label()}",
@@ -175,47 +181,102 @@ internal fun RenewalHero(
             }
         }
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 46.dp, bottom = 38.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                stringResource(R.string.next_renewal),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.68f),
+        if (compact) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RenewalSummary(
+                    remaining = remaining,
+                    renewalDate = sim.nextRenewalDate,
+                    compact = true,
+                    modifier = Modifier.weight(1f),
+                )
+                HeroAction(
+                    icon = Icons.Default.Check,
+                    label = stringResource(R.string.mark_as_renewed),
+                    onClick = onRenew,
+                    compact = true,
+                )
+                HeroAction(
+                    icon = Icons.AutoMirrored.Filled.ArrowForward,
+                    label = stringResource(R.string.action_view_details),
+                    onClick = onOpen,
+                    compact = true,
+                )
+            }
+        } else {
+            RenewalSummary(
+                remaining = remaining,
+                renewalDate = sim.nextRenewalDate,
+                compact = false,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 46.dp, bottom = 38.dp),
             )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                daysRemainingLabel(remaining),
-                style = MaterialTheme.typography.displaySmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                sim.nextRenewalDate.displayDate(),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.72f),
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                HeroAction(
+                    icon = Icons.Default.Check,
+                    label = stringResource(R.string.mark_as_renewed),
+                    onClick = onRenew,
+                )
+                HeroAction(
+                    icon = Icons.AutoMirrored.Filled.ArrowForward,
+                    label = stringResource(R.string.action_view_details),
+                    onClick = onOpen,
+                )
+            }
         }
+    }
+}
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-        ) {
-            HeroAction(
-                icon = Icons.Default.Check,
-                label = stringResource(R.string.mark_as_renewed),
-                onClick = onRenew,
-            )
-            HeroAction(
-                icon = Icons.AutoMirrored.Filled.ArrowForward,
-                label = stringResource(R.string.action_view_details),
-                onClick = onOpen,
-            )
-        }
+@Composable
+private fun RenewalSummary(
+    remaining: Long,
+    renewalDate: LocalDate,
+    compact: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            stringResource(R.string.next_renewal),
+            style = if (compact) {
+                MaterialTheme.typography.labelLarge
+            } else {
+                MaterialTheme.typography.titleMedium
+            },
+            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.68f),
+        )
+        Spacer(Modifier.height(if (compact) 2.dp else 8.dp))
+        Text(
+            daysRemainingLabel(remaining),
+            style = if (compact) {
+                MaterialTheme.typography.headlineMedium
+            } else {
+                MaterialTheme.typography.displaySmall
+            },
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(if (compact) 2.dp else 8.dp))
+        Text(
+            renewalDate.displayDate(),
+            style = if (compact) {
+                MaterialTheme.typography.bodySmall
+            } else {
+                MaterialTheme.typography.bodyLarge
+            },
+            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.72f),
+        )
     }
 }
 @Composable
@@ -259,15 +320,16 @@ private fun HeroAction(
     icon: ImageVector,
     label: String,
     onClick: () -> Unit,
+    compact: Boolean = false,
 ) {
     Column(
-        modifier = Modifier.width(132.dp),
+        modifier = Modifier.width(if (compact) 112.dp else 132.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Surface(
             onClick = onClick,
             modifier = Modifier
-                .size(66.dp)
+                .size(if (compact) 48.dp else 66.dp)
                 .semantics {
                     contentDescription = label
                     role = Role.Button
@@ -277,13 +339,21 @@ private fun HeroAction(
             shape = CircleShape,
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(icon, contentDescription = null, modifier = Modifier.size(27.dp))
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(if (compact) 22.dp else 27.dp),
+                )
             }
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(if (compact) 4.dp else 8.dp))
         Text(
             label,
-            style = MaterialTheme.typography.labelLarge,
+            style = if (compact) {
+                MaterialTheme.typography.labelMedium
+            } else {
+                MaterialTheme.typography.labelLarge
+            },
             color = MaterialTheme.colorScheme.onPrimaryContainer,
             textAlign = TextAlign.Center,
             maxLines = 2,

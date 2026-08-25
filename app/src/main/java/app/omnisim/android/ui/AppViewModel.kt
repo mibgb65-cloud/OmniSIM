@@ -372,6 +372,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
                         updatedAt = now,
                     ),
                 )
+                container.settingsRepository.markBackupDirty()
                 scheduleAndCheckReminders()
             }
             if (result.isSuccess) {
@@ -398,6 +399,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
             amount,
             notes.nullIfBlank(),
         )
+        container.settingsRepository.markBackupDirty()
         scheduleAndCheckReminders()
     }
 
@@ -415,6 +417,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
             amount = amount,
             notes = notes.nullIfBlank(),
         )
+        container.settingsRepository.markBackupDirty()
         scheduleAndCheckReminders()
     }
 
@@ -423,6 +426,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         R.string.message_renewal_undo_failed,
     ) {
         container.simRepository.undoLatestRenewal(historyId)
+        container.settingsRepository.markBackupDirty()
         scheduleAndCheckReminders()
     }
 
@@ -431,6 +435,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         R.string.message_sim_update_failed,
     ) {
         container.simRepository.setArchived(id, archived)
+        container.settingsRepository.markBackupDirty()
         scheduleAndCheckReminders()
     }
 
@@ -444,6 +449,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
             R.string.message_setting_failed,
         ) {
             container.simRepository.setReminderSettings(id, enabled, offsets)
+            container.settingsRepository.markBackupDirty()
             scheduleAndCheckReminders()
         }
     }
@@ -453,6 +459,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         R.string.message_sim_delete_failed,
     ) {
         container.simRepository.delete(id)
+        container.settingsRepository.markBackupDirty()
     }
 
     fun setThemeMode(value: ThemeMode) = launchSettings { container.settingsRepository.setThemeMode(value) }
@@ -520,6 +527,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         pendingRestore.value = null
         launchAction(R.string.message_backup_restored, R.string.message_restore_failed) {
             container.backupManager.restore(payload)
+            container.settingsRepository.markBackupDirty()
             recoverySnapshotAvailable.value = true
             scheduleAndCheckReminders()
         }

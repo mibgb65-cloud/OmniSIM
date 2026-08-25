@@ -70,8 +70,6 @@ import app.omnisim.android.data.preferences.AppSettings
 import app.omnisim.android.data.preferences.ThemeMode
 import app.omnisim.android.data.update.AppReleaseInfo
 import app.omnisim.android.data.update.AppUpdateDownloadState
-import app.omnisim.android.notification.NotificationAvailability
-import app.omnisim.android.notification.NotificationHelper
 import app.omnisim.android.ui.components.OmniDialogSystemBars
 import app.omnisim.android.ui.components.CurrencyPickerField
 import app.omnisim.android.ui.components.omniTextFieldColors
@@ -93,95 +91,6 @@ enum class SettingsSection {
     DataPrivacy,
     HelpAbout,
 }
-@Composable
-internal fun NotificationHealthCard(
-    availability: NotificationAvailability,
-    lastReminderCheckAt: Instant?,
-    onSendTestNotification: () -> Unit,
-    onOpenNotificationSettings: () -> Unit,
-) {
-    SettingsCard {
-        Text(
-            stringResource(R.string.notification_health_title),
-            style = MaterialTheme.typography.titleSmall,
-        )
-        NotificationStatusLine(
-            title = stringResource(R.string.notification_delivery_status),
-            value = stringResource(
-                when {
-                    !availability.runtimePermissionGranted ->
-                        R.string.notification_status_permission_required
-                    !availability.appNotificationsEnabled ->
-                        R.string.notification_status_app_disabled
-                    !availability.channelEnabled ->
-                        R.string.notification_status_channel_disabled
-                    else -> R.string.notification_status_ready
-                },
-            ),
-            healthy = availability.canPost,
-        )
-        NotificationStatusLine(
-            title = stringResource(R.string.notification_background_status),
-            value = lastReminderCheckAt?.let { checkedAt ->
-                reminderCheckTimeLabel(checkedAt)
-            } ?: stringResource(R.string.notification_background_not_run),
-            healthy = lastReminderCheckAt != null,
-        )
-        Text(
-            stringResource(R.string.background_limitation),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (!availability.canPost) {
-                TextButton(onClick = onOpenNotificationSettings) {
-                    Text(stringResource(R.string.open_notification_settings))
-                }
-            }
-            Button(
-                onClick = onSendTestNotification,
-                enabled = availability.canPost,
-                shape = CircleShape,
-            ) {
-                Text(stringResource(R.string.send_test_notification))
-            }
-        }
-    }
-}
-
-@Composable
-private fun NotificationStatusLine(
-    title: String,
-    value: String,
-    healthy: Boolean,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top,
-    ) {
-        Text(
-            title,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        Text(
-            value,
-            modifier = Modifier.weight(1.4f),
-            style = MaterialTheme.typography.bodySmall,
-            color = if (healthy) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.error
-            },
-        )
-    }
-}
-
 @Composable
 internal fun AppUpdateDialog(
     state: AppUpdateUiState,

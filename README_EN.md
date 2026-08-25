@@ -189,6 +189,9 @@ invalid input leaves existing data unchanged.
 OmniSIM schedules one battery-friendly periodic WorkManager task. Default offsets
 are 30, 14, 7, 3, 1, and 0 days plus overdue. Notifications are deduplicated with
 `SIM ID + renewal date + offset`; renewal clears obsolete state and reschedules work.
+If a delayed check crosses an offset, OmniSIM catches up only the nearest unsent
+reminder. Settings shows the latest scan/send counts and links to notification and
+background-access controls.
 
 WorkManager timing is approximate. Doze, battery saver, app standby, and
 manufacturer battery policies may delay background work, so reminders are not

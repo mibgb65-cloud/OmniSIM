@@ -16,6 +16,7 @@ import app.omnisim.android.ui.navigation.OmniSimApp
 
 class MainActivity : AppCompatActivity() {
     private var requestedSimId by mutableStateOf<String?>(null)
+    private var requestedRenewal by mutableStateOf(false)
     private var systemSplashExited by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -27,6 +28,7 @@ class MainActivity : AppCompatActivity() {
         }
         enableEdgeToEdge()
         requestedSimId = intent.getStringExtra(EXTRA_SIM_ID)
+        requestedRenewal = intent.getBooleanExtra(EXTRA_OPEN_RENEWAL, false)
         val playLaunchAnimation = savedInstanceState == null
         val container = (application as OmniSimApplication).container
         setContent {
@@ -34,7 +36,11 @@ class MainActivity : AppCompatActivity() {
             OmniSimApp(
                 viewModel = appViewModel,
                 externalSimId = requestedSimId,
-                onExternalNavigationHandled = { requestedSimId = null },
+                externalRenewalRequested = requestedRenewal,
+                onExternalNavigationHandled = {
+                    requestedSimId = null
+                    requestedRenewal = false
+                },
                 playLaunchAnimation = playLaunchAnimation,
                 launchAnimationStarted = systemSplashExited,
             )
@@ -44,9 +50,11 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         requestedSimId = intent.getStringExtra(EXTRA_SIM_ID)
+        requestedRenewal = intent.getBooleanExtra(EXTRA_OPEN_RENEWAL, false)
     }
 
     companion object {
         const val EXTRA_SIM_ID = "sim_id"
+        const val EXTRA_OPEN_RENEWAL = "open_renewal"
     }
 }

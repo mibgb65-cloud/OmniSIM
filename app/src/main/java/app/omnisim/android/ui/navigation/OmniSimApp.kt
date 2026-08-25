@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.absolutePadding
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -39,7 +38,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -50,13 +48,11 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -97,8 +93,6 @@ import app.omnisim.android.ui.appUpdateStateForRoute
 import app.omnisim.android.ui.components.OmniCircleIconButton
 import app.omnisim.android.ui.components.OmniPageSurface
 import app.omnisim.android.ui.components.OmniPageTitleStyle
-import app.omnisim.android.ui.components.OmniSheetHeader
-import app.omnisim.android.ui.components.OmniDialogSystemBars
 import app.omnisim.android.ui.components.omniPrimaryPageBackground
 import app.omnisim.android.ui.editsim.AddEditSimScreen
 import app.omnisim.android.ui.home.HomeScreen
@@ -126,6 +120,7 @@ import kotlinx.coroutines.delay
 fun OmniSimApp(
     viewModel: AppViewModel,
     externalSimId: String?,
+    externalRenewalRequested: Boolean,
     onExternalNavigationHandled: () -> Unit,
     playLaunchAnimation: Boolean,
     launchAnimationStarted: Boolean,
@@ -142,11 +137,20 @@ fun OmniSimApp(
     val uriHandler = LocalUriHandler.current
     val isPrimary = route in bottomDestinations.map(BottomDestination::route)
     var showAddSim by rememberSaveable { mutableStateOf(false) }
+    var pendingExternalRenewalSimId by rememberSaveable { mutableStateOf<String?>(null) }
+    var offerNotificationsAfterAdd by rememberSaveable { mutableStateOf(false) }
+    var showNotificationPrompt by rememberSaveable { mutableStateOf(false) }
+    val requestNotificationPermission = rememberNotificationPermissionRequest { granted ->
+        if (granted) viewModel.checkRemindersNow()
+    }
+    val openAddSim = {
+        offerNotificationsAfterAdd = state.sims.isEmpty() && shouldOfferNotificationPermission(context)
+        showAddSim = true
+    }
     val launchAnimationsEnabled = rememberSystemAnimationsEnabled()
     var launchRevealFinished by remember(playLaunchAnimation) {
         mutableStateOf(!playLaunchAnimation)
     }
-
     LaunchedEffect(playLaunchAnimation, launchAnimationStarted, launchAnimationsEnabled) {
         if (playLaunchAnimation && launchAnimationStarted) {
             if (launchAnimationsEnabled) {
@@ -170,13 +174,13 @@ fun OmniSimApp(
             snackbarHostState.showSnackbar(resources.getString(message.text))
         }
     }
-    LaunchedEffect(externalSimId, hasLegalConsent) {
+    LaunchedEffect(externalSimId, externalRenewalRequested, hasLegalConsent) {
         if (hasLegalConsent) externalSimId?.let {
+            if (externalRenewalRequested) pendingExternalRenewalSimId = it
             navController.navigate(Routes.detail(it)) { launchSingleTop = true }
             onExternalNavigationHandled()
         }
     }
-
     OmniSimTheme(state.settings) {
         val bottomNavigationContentPadding =
             96.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -235,7 +239,7 @@ fun OmniSimApp(
                             sims = state.sims,
                             history = state.history,
                             settings = state.settings,
-                            onAdd = { showAddSim = true },
+                            onAdd = openAddSim,
                             onOpenSim = { navController.navigate(Routes.detail(it)) },
                             onRenew = { sim, actual, next, amount, notes ->
                                 viewModel.recordRenewal(sim.id, actual, next, amount, notes)
@@ -258,7 +262,7 @@ fun OmniSimApp(
                         titleStyle = OmniPageTitleStyle.Bubble,
                         action = {
                             OmniCircleIconButton(
-                                onClick = { showAddSim = true },
+                                onClick = openAddSim,
                                 emphasized = true,
                             ) {
                                 Icon(
@@ -495,6 +499,8 @@ fun OmniSimApp(
                                         launchSingleTop = true
                                     }
                                 },
+                                openRenewalRequested = pendingExternalRenewalSimId == sim.id,
+                                onOpenRenewalHandled = { pendingExternalRenewalSimId = null },
                             )
                         }
                     }
@@ -527,36 +533,22 @@ fun OmniSimApp(
                 }
 
                 if (showAddSim) {
-                    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-                    ModalBottomSheet(
-                        onDismissRequest = { showAddSim = false },
-                        sheetState = sheetState,
-                        dragHandle = null,
-                        containerColor = MaterialTheme.colorScheme.background,
-                        shape = RoundedCornerShape(topStart = 34.dp, topEnd = 34.dp),
-                    ) {
-                        OmniDialogSystemBars()
-                        Column(Modifier.fillMaxSize()) {
-                            OmniSheetHeader(
-                                title = stringResource(R.string.title_add_sim),
-                                onClose = { showAddSim = false },
-                            )
-                            AddEditSimScreen(
-                                existing = null,
-                                defaultCurrency = state.settings.defaultCurrency,
-                                exchangeRateSnapshot = state.exchangeRateSnapshot,
-                                onSave = viewModel::saveSim,
-                                onDone = {
-                                    showAddSim = false
-                                    navController.navigate(Routes.Home) {
-                                        popUpTo(Routes.Home)
-                                        launchSingleTop = true
-                                    }
-                                },
-                                modifier = Modifier.weight(1f),
-                            )
+                    AddSimSheet(
+                        defaultCurrency = state.settings.defaultCurrency,
+                        exchangeRateSnapshot = state.exchangeRateSnapshot,
+                        onSave = viewModel::saveSim,
+                        onDismiss = { showAddSim = false },
+                        onSaved = {
+                            showAddSim = false
+                            showNotificationPrompt = offerNotificationsAfterAdd &&
+                                shouldOfferNotificationPermission(context)
+                            offerNotificationsAfterAdd = false
+                            navController.navigate(Routes.Home) {
+                                popUpTo(Routes.Home)
+                                launchSingleTop = true
+                            }
                         }
-                    }
+                    )
                 }
             }
 
@@ -590,6 +582,14 @@ fun OmniSimApp(
                 onDismiss = viewModel::dismissUpdateDialog,
             )
         }
+        NotificationPermissionPrompt(
+            visible = showNotificationPrompt,
+            onDismiss = { showNotificationPrompt = false },
+            onEnable = {
+                showNotificationPrompt = false
+                requestNotificationPermission()
+            },
+        )
         if (!state.isLoading && !showLaunch && !hasLegalConsent) {
             LegalConsentDialog(
                 onAgree = viewModel::acceptLegalConsent,

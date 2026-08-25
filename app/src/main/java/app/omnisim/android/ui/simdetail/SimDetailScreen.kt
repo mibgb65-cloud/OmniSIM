@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -79,6 +80,8 @@ fun SimDetailScreen(
     onEdit: () -> Unit,
     onArchive: (Boolean) -> Unit,
     onDelete: () -> Unit,
+    openRenewalRequested: Boolean = false,
+    onOpenRenewalHandled: () -> Unit = {},
 ) {
     val today = rememberCurrentDate()
     val status = calculateRenewalStatus(
@@ -99,6 +102,12 @@ fun SimDetailScreen(
     }
     val priceChange = remember(history, sim.id) {
         calculateLatestRenewalPriceChange(history, sim.id)
+    }
+    LaunchedEffect(openRenewalRequested) {
+        if (openRenewalRequested) {
+            showRenewal = true
+            onOpenRenewalHandled()
+        }
     }
 
     LazyColumn(

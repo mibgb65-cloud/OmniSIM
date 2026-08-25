@@ -86,6 +86,7 @@ class NotificationHelper(private val context: Context) {
 
         val intent = Intent(context, MainActivity::class.java).apply {
             putExtra(MainActivity.EXTRA_SIM_ID, sim.id)
+            putExtra(MainActivity.EXTRA_OPEN_RENEWAL, true)
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
         val pendingIntent = PendingIntent.getActivity(

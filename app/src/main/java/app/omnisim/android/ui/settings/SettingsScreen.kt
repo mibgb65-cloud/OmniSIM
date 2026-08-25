@@ -66,6 +66,7 @@ import app.omnisim.android.backup.BackupPayload
 import app.omnisim.android.data.exchange.ExchangeRateSnapshot
 import app.omnisim.android.data.preferences.AppSettings
 import app.omnisim.android.data.preferences.ThemeMode
+import app.omnisim.android.domain.util.isBackupRecommended
 import app.omnisim.android.notification.NotificationAvailability
 import app.omnisim.android.notification.NotificationHelper
 import app.omnisim.android.ui.components.OmniDialogSystemBars
@@ -345,7 +346,7 @@ fun SettingsScreen(
         item {
             NotificationHealthCard(
                 availability = notificationAvailability,
-                lastReminderCheckAt = settings.lastReminderCheckAt,
+                settings = settings,
                 onSendTestNotification = onSendTestNotification,
                 onOpenNotificationSettings = onOpenNotificationSettings,
             )
@@ -429,15 +430,16 @@ fun SettingsScreen(
         item { SectionTitle(stringResource(R.string.settings_data)) }
         item {
             val lastBackupAt = settings.lastBackupAt
-            val backupIsStale = lastBackupAt == null ||
-                lastBackupAt.plusSeconds(30L * 24 * 60 * 60).isBefore(Instant.now())
+            val backupIsStale = isBackupRecommended(lastBackupAt, settings.backupDirty, Instant.now())
             SettingsCard {
                 Text(
                     stringResource(R.string.backup_status),
                     style = MaterialTheme.typography.titleSmall,
                 )
                 Text(
-                    lastBackupAt?.let { backupAt ->
+                    if (settings.backupDirty) {
+                        stringResource(R.string.backup_changes_pending)
+                    } else lastBackupAt?.let { backupAt ->
                         stringResource(R.string.last_backup_time, reminderCheckTimeLabel(backupAt))
                     } ?: stringResource(R.string.no_backup_created),
                     style = MaterialTheme.typography.bodyMedium,

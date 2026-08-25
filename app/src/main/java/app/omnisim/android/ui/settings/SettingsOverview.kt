@@ -44,7 +44,9 @@ internal fun SettingsOverview(
             ),
         )
     }
-    val backupSummary = settings.lastBackupAt?.let { backupAt ->
+    val backupSummary = if (settings.backupDirty) {
+        stringResource(R.string.backup_changes_pending)
+    } else settings.lastBackupAt?.let { backupAt ->
         stringResource(R.string.last_backup_time, reminderCheckTimeLabel(backupAt))
     } ?: stringResource(R.string.no_backup_created_short)
 

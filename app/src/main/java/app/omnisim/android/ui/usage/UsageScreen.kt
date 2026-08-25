@@ -111,7 +111,10 @@ fun UsageScreen(
             }
             .sortedBy(CurrencyCost::currency)
     }
-    val missingCount = activeSims.size - costs.size
+    val costSimIds = remember(costs) { costs.mapTo(mutableSetOf()) { it.sim.id } }
+    val missingSims = remember(activeSims, costSimIds) {
+        activeSims.filterNot { it.id in costSimIds }
+    }
     val rateSnapshot = (exchangeRateState as? ExchangeRateUiState.Ready)?.snapshot
     val convertedTotal = remember(costs, targetCurrency, rateSnapshot) {
         calculateConvertedCostTotal(
@@ -175,23 +178,19 @@ fun UsageScreen(
             }
         }
 
-        if (summaries.isNotEmpty() && missingCount > 0) {
-            item {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    shape = MaterialTheme.shapes.large,
-                ) {
-                    Text(
-                        pluralStringResource(
-                            R.plurals.cost_missing_data,
-                            missingCount,
-                            missingCount,
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(OmniCardPadding),
-                    )
-                }
+        if (summaries.isNotEmpty() && missingSims.isNotEmpty()) {
+            item(key = "missing-cost-header") {
+                OmniSectionHeader(
+                    text = pluralStringResource(
+                        R.plurals.cost_missing_data,
+                        missingSims.size,
+                        missingSims.size,
+                    ),
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+            items(missingSims, key = { "missing-${it.id}" }) { sim ->
+                MissingCostRow(sim = sim, onClick = { onOpenSim(sim.id) })
             }
         }
     }

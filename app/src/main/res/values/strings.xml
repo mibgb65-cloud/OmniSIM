@@ -19,6 +19,9 @@
     <string name="nothing_needs_attention">Nothing needs attention</string>
     <string name="renewals_up_to_date">Your SIM renewals are all up to date.</string>
     <string name="upcoming">Upcoming</string>
+    <string name="needs_attention">Needs attention</string>
+    <string name="no_upcoming_renewals">No later renewals</string>
+    <string name="no_upcoming_renewals_description">Add another SIM or update a renewal date when needed.</string>
     <string name="no_sims_yet">No SIMs yet</string>
     <string name="no_sims_description">Add your first SIM or eSIM to start tracking renewal dates.</string>
     <string name="mark_as_renewed">Mark as renewed</string>
@@ -53,6 +56,7 @@
     <string name="error_non_negative_amount">Enter a non-negative amount</string>
     <string name="action_ok">OK</string>
     <string name="action_cancel">Cancel</string>
+    <string name="action_not_now">Not now</string>
     <string name="action_retry">Retry</string>
 
     <string name="search_sims">Search SIMs</string>
@@ -302,6 +306,11 @@
     <string name="notification_delivery_status">Delivery</string>
     <string name="notification_background_status">Background task</string>
     <string name="notification_background_not_run">Not checked yet</string>
+    <string name="notification_background_success">%1$s · scanned %2$d · sent %3$d</string>
+    <string name="notification_background_stale">Last checked %1$s; background access may be restricted</string>
+    <string name="notification_background_blocked">%1$s · notification delivery blocked</string>
+    <string name="notification_background_failed">%1$s · check failed and will retry</string>
+    <string name="notification_background_previous">Last checked %1$s · details available after the next check</string>
     <string name="notification_status_ready">Ready</string>
     <string name="notification_status_needs_attention">Notifications need setup</string>
     <string name="notification_status_permission_required">Permission required</string>
@@ -309,6 +318,7 @@
     <string name="notification_status_channel_disabled">Reminder channel disabled</string>
     <string name="send_test_notification">Send test</string>
     <string name="open_notification_settings">Android settings</string>
+    <string name="open_background_settings">Background access</string>
     <string name="test_notification_title">OmniSIM notifications are ready</string>
     <string name="test_notification_body">Test successful. Renewal reminders can appear on this device.</string>
     <string name="message_test_notification_sent">Test notification sent</string>
@@ -333,6 +343,7 @@
     <string name="settings_data">Data</string>
     <string name="backup_status">Backup status</string>
     <string name="last_backup_time">Last exported: %1$s</string>
+    <string name="backup_changes_pending">Changes have not been exported yet</string>
     <string name="no_backup_created">No backup has been exported on this device.</string>
     <string name="backup_recommended">Export a backup regularly and before clearing data, uninstalling, or changing devices.</string>
     <string name="export_backup">Export backup</string>

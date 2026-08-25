@@ -11,11 +11,13 @@ class ReminderLogicTest {
     private val offsets = setOf(30, 14, 7, 3, 1, 0, -1)
 
     @Test
-    fun `matches configured exact offsets`() {
+    fun `matches configured offsets and catches up the nearest crossed offset`() {
         assertEquals(30, matchedReminderOffset(30, offsets))
         assertEquals(7, matchedReminderOffset(7, offsets))
         assertEquals(0, matchedReminderOffset(0, offsets))
-        assertNull(matchedReminderOffset(6, offsets))
+        assertEquals(7, matchedReminderOffset(6, offsets))
+        assertEquals(3, matchedReminderOffset(2, offsets))
+        assertNull(matchedReminderOffset(31, offsets))
     }
 
     @Test
@@ -33,4 +35,3 @@ class ReminderLogicTest {
         assertTrue(shouldSendReminder(key.copy(reminderOffset = 3), setOf(key)))
     }
 }
-
